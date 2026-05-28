@@ -1,0 +1,132 @@
+Voomi Supply LLC — Finding Breakdown
+5.78.67.23 / voomisupply.com
+NuClide Research | 2026-05-28
+==============================================================
+
+
+FINDING 1: Elasticsearch Superuser Credentials in Temporal Schedule Config — CRITICAL
+======================================================================================
+
+What it is.
+Temporal is a workflow orchestration platform. Workflow schedules are recurring
+jobs — configured with a name, schedule interval, and input parameters. Those
+parameters are stored in the Temporal server and visible in the UI. Voomi's
+catalog sync schedules contain plaintext Elasticsearch credentials in their
+parameter payloads:
+
+  Host:     5.78.67.23:9200
+  Username: elastic
+  Password: PzBv81Jo3992T77hVbxN
+  Indexes:  voomi-walmart-catalog, voomi-test-catalog
+
+The `elastic` account is Elasticsearch's built-in superuser. It has full
+cluster admin — read, write, delete, create/drop indexes, manage users and
+roles, take snapshots, and export all data. There is no privilege it lacks.
+
+What's exposed.
+The complete product catalog Voomi uses to sync HVAC/industrial listings to
+Walmart. voomi-walmart-catalog is the live production index — every SKU, price,
+inventory count, supplier mapping, and product attribute Voomi presents to
+Walmart's marketplace. voomi-test-catalog is the development/staging equivalent.
+
+Because the credential is superuser, the blast radius extends past data read:
+an attacker could modify catalog data, inject fraudulent listings, corrupt
+pricing, delete the entire index, or add new Elasticsearch users to maintain
+persistent access.
+
+How the credential was obtained.
+The Temporal Web UI is publicly accessible without authentication (see Finding 2).
+Any unauthenticated visitor can read the full schedule configuration, including
+the parameter payload containing these credentials.
+
+CWE: CWE-312 (Cleartext Storage of Sensitive Information) /
+     CWE-522 (Insufficiently Protected Credentials)
+
+Credentials are confirmed in hand. The Elasticsearch cluster has not been
+accessed. No data read, no index enumeration, no authentication attempt against
+5.78.67.23:9200.
+
+
+FINDING 2: Temporal Scheduler Publicly Accessible — No Authentication — CRITICAL
+==================================================================================
+
+What it is.
+The Temporal Web UI serves a full administrative interface for managing
+workflow orchestration. It shows every workflow definition, running execution,
+schedule, task queue, and historical run. It is the control plane for Voomi's
+catalog sync pipeline.
+
+It has no authentication. Any HTTP client can reach it and read everything,
+including the schedule parameter payloads that contain the Elasticsearch
+credentials described in Finding 1.
+
+What's exposed.
+- All workflow schedule names, intervals, and full parameter payloads
+- Embedded plaintext credentials for downstream systems (ES credentials confirmed;
+  other credentials may exist in other schedule configs)
+- Workflow execution history — every catalog sync run, its timing, success/failure
+- Task queue names revealing internal service architecture
+- The ability to pause, resume, trigger, or delete any workflow schedule
+
+Why it's worse than an open dashboard.
+Most unauthenticated dashboards expose metrics or read-only state. Temporal
+exposes credentials embedded in workflow configs. The primary risk isn't an
+attacker reading the dashboard — it's that the dashboard is the vector to
+harvest credentials for every system the workflows touch. Voomi's catalog
+pipeline connects to Elasticsearch, Walmart's API, and likely multiple
+distributor APIs. If those systems also have credentials in schedule configs,
+they are all exposed through this single unauthenticated entry point.
+
+CWE: CWE-306 (Missing Authentication for Critical Function)
+
+
+FINDING 3: Kibana 8.17.2 Version Disclosure — INFO
+====================================================
+(Authentication enforced — not directly exploitable)
+
+What it is.
+Kibana is the web UI layer for Elasticsearch. It is running on port 5601 on
+the same host as the Elasticsearch cluster. Authentication is enforced — the
+root path redirects to /login and the index patterns API returns 401.
+
+The /api/status endpoint returns {"status":{"overall":{"level":"available"}}}
+without authentication. This confirms Kibana is running and discloses the
+version (8.17.2) via the kbn-name response header (segment-es-01).
+
+Why it's logged.
+Version disclosure is low-risk in isolation. Combined with Findings 1 and 2:
+if an attacker uses the harvested elastic credentials to access Kibana
+directly, they have a full visual interface into the Elasticsearch cluster —
+index browsing, query execution, document inspection, user management. The
+version disclosure doesn't add risk by itself, but the authenticated path
+using Finding 1 credentials would give full Kibana admin.
+
+BARE matched kibana_upgrade_assistant_telemetry_rce (0.589) and
+kibana_timelion_prototype_pollution_rce (0.584) — both are 2019-era CVEs
+affecting Kibana 6.x. Not applicable to 8.17.2.
+
+
+SIDE FINDING: LilySilk GCS Bucket — PUBLIC (Out of Scope for this assessment)
+===============================================================================
+
+menlohunt surfaced a public GCS bucket (storage.googleapis.com/static-dev)
+via generic bucket name enumeration. 258 objects publicly readable. The
+bucket was incorrectly attributed to voomi by the tool — index.html contains
+references to www.lilysilk.com and static-dev.lilysilk.com, confirming the
+operator is LilySilk, a Chinese luxury silk clothing brand.
+
+Contents: dev/staging internal admin panel frontend (React SPA with route
+chunks for order management, customer management, role/authority management,
+channel settings, birthday poster config). Exposes the full frontend source
+code and routing structure of LilySilk's internal CRM.
+
+This is a separate HIGH finding for LilySilk — out of scope for the voomi
+assessment but worth a separate disclosure.
+
+
+==============================================================
+Severity summary: CRITICAL x2 | HIGH x0 | INFO x1 | (side: HIGH x1, LilySilk)
+Confirmed exploitable today: Findings 1 + 2 (credentials in hand, zero auth required)
+ES cluster: NOT accessed — ethical stop applied
+Temporal host IP: not yet confirmed — separate from 5.78.67.23
+==============================================================
