@@ -152,9 +152,9 @@ BARE semantic matches for Kibana surface: `kibana_upgrade_assistant_telemetry_rc
 
 ## Disclosure
 
-No formal program. Recommended path:
-- **Primary:** support@voomisupply.com
-- **Secondary:** LinkedIn → RJ Cilley (CEO)
+No formal program. Disclosure sent 2026-05-28:
+- **Primary:** support@voomisupply.com — **SENT**
+- **Secondary:** LinkedIn → RJ Cilley (CEO) — on standby if no response
 
 ---
 
