@@ -4,10 +4,10 @@ import asyncio
 import json
 import re
 from datetime import datetime, timezone
-import anthropic
 import httpx
 from platoon.models.spot_report import SPOTReport, Finding
 from platoon.models.tasking import SquadTasking
+from platoon.utils.claude_runner import run_claude
 from platoon.utils.logger import get_logger
 
 _SYSTEM = """\
@@ -96,9 +96,6 @@ async def _cert_transparency(domain: str) -> list[str]:
 
 
 class SquadBravo:
-    def __init__(self, client: anthropic.AsyncAnthropic):
-        self.client = client
-
     async def run(self, target: str, tasking: SquadTasking) -> SPOTReport:
         log = get_logger()
         log.log("squad_dispatched", squad="bravo", objective=tasking.objective[:80])
@@ -111,11 +108,11 @@ class SquadBravo:
         # Parallel passive collection
         infra_data: dict[str, dict] = {}
         for domain in domains[:3]:
-            dns_task = asyncio.create_task(_dns_lookup(domain))
-            whois_task = asyncio.create_task(_whois_lookup(domain))
-            ct_task = asyncio.create_task(_cert_transparency(domain))
             dns_res, whois_res, ct_res = await asyncio.gather(
-                dns_task, whois_task, ct_task, return_exceptions=True
+                _dns_lookup(domain),
+                _whois_lookup(domain),
+                _cert_transparency(domain),
+                return_exceptions=True,
             )
             infra_data[domain] = {
                 "dns": dns_res if not isinstance(dns_res, Exception) else {},
@@ -123,7 +120,6 @@ class SquadBravo:
                 "cert_transparency": ct_res if not isinstance(ct_res, Exception) else [],
             }
 
-        # Feed raw data to Claude for synthesis + enrichment
         brief = (
             f"MISSION — SQUAD BRAVO — INFRASTRUCTURE RECON\n\n"
             f"Primary target: {target}\n"
@@ -131,7 +127,7 @@ class SquadBravo:
             f"Mode: {tasking.mode.upper()}\n\n"
             f"RAW PASSIVE COLLECTION:\n"
             f"{json.dumps(infra_data, indent=2, default=str)[:3000]}\n\n"
-            f"Analyze this data and use web_search to:\n"
+            f"Analyze this data and use web search to:\n"
             f"1. Identify the hosting provider and ASN\n"
             f"2. Look up significant IPs in threat intel\n"
             f"3. Find historical DNS records (SecurityTrails, viewdns.info)\n"
@@ -140,33 +136,13 @@ class SquadBravo:
             f"Conclude with the SPOT JSON block."
         )
 
-        messages = [{"role": "user", "content": brief}]
-        all_text: list[str] = []
+        text = await run_claude(
+            brief,
+            system=_SYSTEM,
+            model="claude-sonnet-4-6",
+            allow_web_search=True,
+        )
 
-        for _ in range(5):
-            resp = await self.client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=8192,
-                system=_SYSTEM,
-                tools=[{"type": "web_search_20260209", "name": "web_search"}],
-                messages=messages,
-            )
-            for block in resp.content:
-                if hasattr(block, "text"):
-                    all_text.append(block.text)
-            if resp.stop_reason == "end_turn":
-                break
-            if resp.stop_reason == "pause_turn":
-                messages.append({"role": "assistant", "content": resp.content})
-            else:
-                break
-
-        if resp.usage:
-            log.log_tokens("bravo", resp.usage.input_tokens, resp.usage.output_tokens)
-
-        text = "\n".join(all_text)
-
-        # Build finds from raw infra data even if JSON parse fails
         raw_finds = _extract_raw_finds(infra_data, domains)
         report = _parse_spot(text, "bravo", raw_finds)
         log.log("spot_report", squad="bravo", findings=len(report.finds), pivots=len(report.pivots))

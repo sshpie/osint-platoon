@@ -1,8 +1,8 @@
 """Squad Charlie — Social Footprint. Username enumeration, public profiles, linked accounts."""
 from __future__ import annotations
-import anthropic
 from platoon.models.spot_report import SPOTReport
 from platoon.models.tasking import SquadTasking
+from platoon.utils.claude_runner import run_claude
 from platoon.utils.logger import get_logger
 from platoon.squads.alpha import _parse_spot
 
@@ -44,9 +44,6 @@ Output: Conclude with SPOT JSON:
 
 
 class SquadCharlie:
-    def __init__(self, client: anthropic.AsyncAnthropic):
-        self.client = client
-
     async def run(self, target: str, tasking: SquadTasking) -> SPOTReport:
         log = get_logger()
         log.log("squad_dispatched", squad="charlie", objective=tasking.objective[:80])
@@ -67,31 +64,12 @@ class SquadCharlie:
             f"Conclude with the SPOT JSON block."
         )
 
-        messages = [{"role": "user", "content": brief}]
-        all_text: list[str] = []
-
-        for _ in range(5):
-            resp = await self.client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=8192,
-                system=_SYSTEM,
-                tools=[{"type": "web_search_20260209", "name": "web_search"}],
-                messages=messages,
-            )
-            for block in resp.content:
-                if hasattr(block, "text"):
-                    all_text.append(block.text)
-            if resp.stop_reason == "end_turn":
-                break
-            if resp.stop_reason == "pause_turn":
-                messages.append({"role": "assistant", "content": resp.content})
-            else:
-                break
-
-        if resp.usage:
-            log.log_tokens("charlie", resp.usage.input_tokens, resp.usage.output_tokens)
-
-        text = "\n".join(all_text)
+        text = await run_claude(
+            brief,
+            system=_SYSTEM,
+            model="claude-sonnet-4-6",
+            allow_web_search=True,
+        )
         report = _parse_spot(text, "charlie")
         log.log("spot_report", squad="charlie", findings=len(report.finds), pivots=len(report.pivots))
         return report

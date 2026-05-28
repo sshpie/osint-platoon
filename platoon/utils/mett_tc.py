@@ -1,8 +1,8 @@
 from __future__ import annotations
 import json
 import re
-import anthropic
-from platoon.models.tasking import MissionTasking, SquadTasking
+from platoon.models.tasking import SquadTasking
+from platoon.utils.claude_runner import run_claude
 
 METT_TC_PROMPT = """\
 You are the Platoon Leader of an OSINT research unit operating under ATP 3-21.8 doctrine.
@@ -36,7 +36,6 @@ All squads operate in RECON mode (passive, read-only) unless explicitly authoriz
 
 
 async def run_mett_tc_analysis(
-    client: anthropic.AsyncAnthropic,
     target: str,
     target_type: str,
     depth: str,
@@ -58,18 +57,12 @@ Conduct METT-TC(I) analysis:
 
 Issue prioritized squad tasking."""
 
-    response = await client.messages.create(
-        model="claude-opus-4-7",
-        max_tokens=4096,
-        thinking={"type": "adaptive"},
+    analysis_text = await run_claude(
+        mission_input,
         system=METT_TC_PROMPT,
-        messages=[{"role": "user", "content": mission_input}],
+        model="claude-opus-4-7",
+        effort="high",
     )
-
-    analysis_text = ""
-    for block in response.content:
-        if block.type == "text":
-            analysis_text += block.text
 
     tasks = _extract_tasks(analysis_text)
     return analysis_text, tasks

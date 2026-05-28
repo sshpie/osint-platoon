@@ -4,10 +4,10 @@ import io
 import json
 import re
 from datetime import datetime, timezone
-import anthropic
 import httpx
 from platoon.models.spot_report import SPOTReport, Finding
 from platoon.models.tasking import SquadTasking
+from platoon.utils.claude_runner import run_claude
 from platoon.utils.logger import get_logger
 from platoon.squads.alpha import _parse_spot
 
@@ -114,9 +114,6 @@ def _metadata_to_findings(metadata: dict, url: str) -> list[Finding]:
 
 
 class WeaponsSquad:
-    def __init__(self, client: anthropic.AsyncAnthropic):
-        self.client = client
-
     async def run(self, target: str, tasking: SquadTasking) -> SPOTReport:
         log = get_logger()
         log.log("squad_dispatched", squad="weapons", objective=tasking.objective[:80])
@@ -136,31 +133,12 @@ class WeaponsSquad:
             f"Conclude with the SPOT JSON block."
         )
 
-        messages = [{"role": "user", "content": brief}]
-        all_text: list[str] = []
-
-        for _ in range(5):
-            resp = await self.client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=8192,
-                system=_SYSTEM,
-                tools=[{"type": "web_search_20260209", "name": "web_search"}],
-                messages=messages,
-            )
-            for block in resp.content:
-                if hasattr(block, "text"):
-                    all_text.append(block.text)
-            if resp.stop_reason == "end_turn":
-                break
-            if resp.stop_reason == "pause_turn":
-                messages.append({"role": "assistant", "content": resp.content})
-            else:
-                break
-
-        if resp.usage:
-            log.log_tokens("weapons", resp.usage.input_tokens, resp.usage.output_tokens)
-
-        text = "\n".join(all_text)
+        text = await run_claude(
+            brief,
+            system=_SYSTEM,
+            model="claude-sonnet-4-6",
+            allow_web_search=True,
+        )
 
         # Extract any PDF URLs found in the text and fetch metadata
         pdf_urls = re.findall(r'https?://[^\s<>"\']+\.pdf(?:\?[^\s<>"\']*)?', text, re.IGNORECASE)[:5]

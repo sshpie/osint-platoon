@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timezone
-import anthropic
 from platoon.models.spot_report import SPOTReport, Finding
 from platoon.models.tasking import SquadTasking
+from platoon.utils.claude_runner import run_claude
 from platoon.utils.logger import get_logger
 
 _SYSTEM = """\
@@ -42,9 +42,6 @@ Output: After completing reconnaissance, end your response with a SPOT report as
 
 
 class SquadAlpha:
-    def __init__(self, client: anthropic.AsyncAnthropic):
-        self.client = client
-
     async def run(self, target: str, tasking: SquadTasking) -> SPOTReport:
         log = get_logger()
         log.log("squad_dispatched", squad="alpha", objective=tasking.objective[:80])
@@ -65,32 +62,12 @@ class SquadAlpha:
             f"Conclude with the SPOT JSON block."
         )
 
-        messages = [{"role": "user", "content": brief}]
-        all_text: list[str] = []
-
-        for _ in range(5):  # max pause_turn continuations
-            resp = await self.client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=8192,
-                system=_SYSTEM,
-                tools=[{"type": "web_search_20260209", "name": "web_search"}],
-                messages=messages,
-            )
-            for block in resp.content:
-                if hasattr(block, "text"):
-                    all_text.append(block.text)
-            if resp.stop_reason == "end_turn":
-                break
-            if resp.stop_reason == "pause_turn":
-                # Server-side tool loop hit limit — continue without adding user message
-                messages.append({"role": "assistant", "content": resp.content})
-            else:
-                break
-
-        if resp.usage:
-            log.log_tokens("alpha", resp.usage.input_tokens, resp.usage.output_tokens)
-
-        text = "\n".join(all_text)
+        text = await run_claude(
+            brief,
+            system=_SYSTEM,
+            model="claude-sonnet-4-6",
+            allow_web_search=True,
+        )
         report = _parse_spot(text, "alpha")
         log.log("spot_report", squad="alpha", findings=len(report.finds), pivots=len(report.pivots),
                 confidence=report.confidence)

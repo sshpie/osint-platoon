@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """OSINT Platoon — CLI entry point."""
 import asyncio
-import os
-import sys
-import anthropic
 import click
 from platoon.orchestrator import Orchestrator
 from platoon.utils.logger import init_logger
@@ -39,17 +36,11 @@ from platoon.utils.logger import init_logger
 )
 def main(target, target_type, depth, max_iterations, dry_run, log_dir):
     """OSINT Platoon — ATP 3-21.8 multi-agent intelligence collection."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        click.echo("Error: ANTHROPIC_API_KEY not set", err=True)
-        sys.exit(1)
-
     log = init_logger(log_dir=log_dir)
     click.echo(f"[PLATOON] Mission: {target} | type={target_type} | depth={depth}")
     click.echo(f"[PLATOON] Log: {log_dir}/mission_{log.mission_id}.jsonl")
 
-    client = anthropic.AsyncAnthropic(api_key=api_key)
-    orchestrator = Orchestrator(client, max_iterations=max_iterations)
+    orchestrator = Orchestrator(max_iterations=max_iterations)
 
     if dry_run:
         click.echo("[PLATOON] Dry-run mode — METT-TC plan only")

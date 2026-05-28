@@ -5,7 +5,6 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-import anthropic
 from platoon.models.salute_report import SALUTEReport, TimelineEntry
 from platoon.models.spot_report import SPOTReport
 from platoon.models.tasking import MissionTasking, SquadTasking
@@ -14,6 +13,7 @@ from platoon.squads.alpha import SquadAlpha
 from platoon.squads.bravo import SquadBravo
 from platoon.squads.charlie import SquadCharlie
 from platoon.squads.weapons import WeaponsSquad
+from platoon.utils.claude_runner import run_claude
 from platoon.utils.logger import get_logger
 from platoon.utils.mett_tc import run_mett_tc_analysis
 
@@ -76,13 +76,12 @@ Output JSON:
 
 
 class Orchestrator:
-    def __init__(self, client: anthropic.AsyncAnthropic, max_iterations: int = 3):
-        self.client = client
+    def __init__(self, max_iterations: int = 3):
         self.max_iterations = max_iterations
-        self._squad_alpha = SquadAlpha(client)
-        self._squad_bravo = SquadBravo(client)
-        self._squad_charlie = SquadCharlie(client)
-        self._weapons = WeaponsSquad(client)
+        self._squad_alpha = SquadAlpha()
+        self._squad_bravo = SquadBravo()
+        self._squad_charlie = SquadCharlie()
+        self._weapons = WeaponsSquad()
 
     # ── TLP Step 1: Receive the mission ──────────────────────────────────────
 
@@ -104,7 +103,7 @@ class Orchestrator:
         # TLP Step 3: Make a tentative plan — METT-TC analysis
         log.log("tlp_step3_mett_tc_start")
         mett_tc_text, squad_tasks = await run_mett_tc_analysis(
-            self.client, target, target_type, depth
+            target, target_type, depth
         )
         log.log("mett_tc_complete", tasks_planned=len(squad_tasks))
 
@@ -245,14 +244,12 @@ class Orchestrator:
         )
 
         try:
-            resp = await self.client.messages.create(
-                model="claude-opus-4-7",
-                max_tokens=2048,
-                thinking={"type": "adaptive"},
+            text = await run_claude(
+                prompt,
                 system=_REPLAN_SYSTEM,
-                messages=[{"role": "user", "content": prompt}],
+                model="claude-opus-4-7",
+                effort="high",
             )
-            text = " ".join(b.text for b in resp.content if hasattr(b, "text"))
             m = re.search(r"```json\s*(\{[\s\S]*?\})\s*```", text)
             if m:
                 return json.loads(m.group(1))
@@ -289,18 +286,12 @@ class Orchestrator:
         )
 
         try:
-            resp = await self.client.messages.create(
-                model="claude-opus-4-7",
-                max_tokens=4096,
-                thinking={"type": "adaptive"},
+            text = await run_claude(
+                prompt,
                 system=_SALUTE_SYSTEM,
-                messages=[{"role": "user", "content": prompt}],
+                model="claude-opus-4-7",
+                effort="high",
             )
-            text = " ".join(b.text for b in resp.content if hasattr(b, "text"))
-
-            if resp.usage:
-                get_logger().log_tokens("salute", resp.usage.input_tokens, resp.usage.output_tokens)
-
             m = re.search(r"```json\s*(\{[\s\S]*?\})\s*```", text)
             if m:
                 data = json.loads(m.group(1))
@@ -349,7 +340,7 @@ class Orchestrator:
         log.log("dry_run_start", target=target)
 
         mett_tc_text, squad_tasks = await run_mett_tc_analysis(
-            self.client, target, target_type, depth
+            target, target_type, depth
         )
 
         lines = [
