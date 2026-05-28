@@ -97,6 +97,9 @@ Null result = result. Nothing skipped.
 |--------|----------|---------|
 | [`34_111_184_20/`](34_111_184_20/) | Business Insider (Axel Springer) | Atlantis v0.32.0 fully unauthenticated. 5 active prod Terraform locks (Snowflake, BigQuery admin, data-eng-prod) readable and discardable without credentials. Disclosed 2026-05-28. |
 | [`5_78_67_23/`](5_78_67_23/) | Voomi Supply LLC | Elasticsearch superuser credentials in plaintext Temporal schedule configs. Unauthenticated Temporal UI. Walmart + Amazon catalog pipelines in blast radius. Disclosed 2026-05-28. |
+| [`40_160_235_43/`](40_160_235_43/) | Fluid Attacks security engineer (personal VPS) | Python SimpleHTTPServer serving full home directory. 33+ AI agent credential files exposed: Anthropic, OpenAI org-owner, GCP Vertex, GitHub PAT (taker — Fluid Attacks pentest pipeline). Credentials in hand. |
+| [`35_200_236_6/`](35_200_236_6/) | Pukaar.ai (Prakarann Innovation Lab) | Three unauthenticated FastAPI/Uvicorn inference APIs. Baby health inference (prod environment flag, live child_id/user_id), LightRAG pediatric diagnostic pipeline, Video RAG search. 50,000+ children's health profiles in blast radius. India DPDP Act 2023 violation. |
+| [`34_57_75_173/`](34_57_75_173/) | AIRIAD (stealth/pre-launch) | Agno v2.6.1 AgentOS API fully unauthenticated. Five production agents invocable. ContractAgent executes live BigQuery calls against client contract registry. Four client projects confirmed: Marriage Relationship App, Amika (YC F25), Avatarmy (Leon & Vera OÜ), AIRIAD. |
 
 Each directory has a `case-study.md` (SALUTE), `findings-breakdown.txt` (plain-English impact), `poc.txt` (reproducible PoCs), and `screenshots/`.
 

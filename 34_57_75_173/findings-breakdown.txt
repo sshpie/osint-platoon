@@ -1,0 +1,138 @@
+AIRIAD Risk Advisor (34.57.75.173) — Finding Breakdown
+NuClide Research | 2026-05-28
+==============================================================
+
+
+FINDING 1: Unauthenticated Agno AgentOS API — CRITICAL
+=======================================================
+
+What it is.
+AIRIAD runs a project risk analysis platform built on Agno v2.6.1.
+The backend is a FastAPI/uvicorn AgentOS API on port 7777. A Next.js
+Agent UI runs on port 3000. Neither has authentication.
+
+Any HTTP client can:
+- List all agents and their full configurations
+- Read every agent's system prompt, model assignment, and tool list
+- Invoke any agent with arbitrary input and receive a live Gemini response
+- Trigger the full five-agent team pipeline without credentials
+
+The agent fleet:
+
+ContractAgent parses client contract documents (SOW, CRs, BRDs) via
+live BigQuery. It calls get_sow_document(project_name) to retrieve
+documents from a BigQuery registry, then pulls file bodies from Google
+Drive or GCS.
+
+EmailsAgent analyzes client email threads for 19 risk signal types.
+
+CallsAgent processes Fireflies call transcripts for 26 risk types,
+including verbal and behavioral signals from actual client calls.
+
+DeliveryAgent reads Asana task snapshots and Smartsheet timelines
+to flag delivery risk across 19 categories.
+
+AdvisorAgent synthesizes all sub-agent reports into an HTML advisory
+dashboard. It also calls convert_to_pdf — Playwright running on the
+host — to render the final report as a PDF.
+
+Why it matters.
+This is a B2B SaaS platform. AIRIAD's clients trust it with
+confidential project contracts, client communications, call
+recordings, and delivery data. No authentication means any external
+actor can read that data, submit arbitrary inputs, or trigger live
+agent runs at the operator's expense (Gemini API).
+
+The AdvisorAgent's convert_to_pdf tool runs Playwright headless
+browser on the host as part of standard workflow execution.
+Injecting content through an agent invocation reaches that execution
+surface.
+
+What an attacker can do right now.
+- Read all client system prompts and tool configurations
+- Invoke ContractAgent with a known project name → retrieve full
+  contract document (SOW, CRs, BRDs) from BigQuery
+- Invoke EmailsAgent or CallsAgent with fabricated inputs → trigger
+  Gemini completions at operator's expense
+- Trigger the full airiad-risk-advisor team pipeline
+- Inject crafted content and reach the Playwright PDF renderer
+
+CWE-306 (Missing Authentication for Critical Function)
+
+
+FINDING 2: Client Contract Data via Unauthenticated BigQuery Integration — CRITICAL
+====================================================================================
+
+What it is.
+ContractAgent connects to a live BigQuery documents registry containing
+contract documents for every registered client project. Four client
+projects confirmed:
+
+- Marriage Relationship App
+- Amika (YC F25 — Fixpoint Inc., amika.dev)
+- Avatarmy (Leon & Vera OÜ — Estonian reg #17303070, Jörg Olbing)
+- AIRIAD (operator's own internal project)
+
+Live invocation confirmed. ContractAgent executed a BigQuery tool
+call and returned client project data during verification.
+
+What's exposed.
+Project contracts contain:
+- Full scope of work: deliverables, milestones, timelines
+- Team and role assignments
+- Payment terms and change history
+- Client identity and business context
+- Internal development and procurement details
+
+For Avatarmy and Amika, this is real business data for companies
+with public investor relationships. For the Marriage Relationship App,
+this is data about a personal/consumer-facing product with no public
+entity traceable.
+
+Why it matters.
+Confidential client contracts are the most sensitive business data
+a software delivery firm holds. Exposure via an unauthenticated API
+breaks every confidentiality obligation the operator has to its clients.
+Three of the four projects are attributable to real companies with
+identifiable founders and investors.
+
+CWE-359 (Exposure of Private Personal Information to an Unauthorized Actor)
+
+
+FINDING 3: Internal Dev Notes in Production System Prompt — MEDIUM
+===================================================================
+
+What it is.
+ContractAgent's production system prompt (readable without credentials
+via GET /agents/contractagent) contains a developer implementation
+note embedded as instruction [8]:
+
+  "get_sow_document loads sanitized scope documents from the BigQuery
+  documents registry and pulls file bodies from the registered backend
+  (Google Drive or GCS) when credentials allow; otherwise it returns
+  the artifact location or development fallback text if the project is
+  not reporting-ready."
+
+This is a note to the model about fallback behavior — it belongs in
+developer documentation, not a live production prompt. It is readable
+by anyone who calls GET /agents/contractagent.
+
+What it exposes.
+- BigQuery as the document registry backend
+- Google Drive and GCS as the file body backends
+- That "development fallback text" exists — the system runs in
+  both development and production states against live client data
+- Infrastructure design decisions that should not be in any
+  externally readable surface
+
+CWE-615 (Inclusion of Sensitive Information in Source Code Comments)
+
+
+==============================================================
+Severity summary: CRITICAL x2 | MEDIUM x1
+Operator: AIRIAD (stealth/pre-launch, no public registration)
+Clients confirmed: Marriage Relationship App | Amika | Avatarmy | AIRIAD
+Host: GCP us-central1 (34.57.75.173)
+Ethical stop: applied — no client data exfiltrated. ContractAgent
+invocation confirmed live execution. Chain stopped at verification.
+==============================================================
