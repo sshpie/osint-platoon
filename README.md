@@ -1,3 +1,9 @@
+```
+┏━┓┏━┓╻┏┓╻╺┳╸   ┏━┓╻  ┏━┓╺┳╸┏━┓┏━┓┏┓╻
+┃ ┃┗━┓┃┃┗┫ ┃    ┣━┛┃  ┣━┫ ┃ ┃ ┃┃ ┃┃┗┫
+┗━┛┗━┛╹╹ ╹ ╹    ╹  ┗━╸╹ ╹ ╹ ┗━┛┗━┛╹ ╹
+```
+
 # OSINT Platoon
 
 Multi-agent OSINT framework built to run natively inside **Claude Code**. Squads are Claude Code `Agent` tool subagents — not subprocess calls, not API wrappers. The orchestrator dispatches parallel agents from inside an active Claude Code session, collects SPOT reports, and synthesizes a SALUTE final product.
