@@ -1,0 +1,37 @@
+{TARGET_LABEL} — Finding Breakdown
+{IP} / {DOMAIN}
+NuClide Research | {DATE}
+==============================================================
+
+
+FINDING N: {TITLE} — {SEVERITY}
+=================================
+({condition qualifier if applicable, e.g. "version unconfirmed", "requires auth"})
+
+What it is.
+[1-2 paragraphs. What the service/component does. What the vulnerability or
+misconfiguration is. No jargon without definition.]
+
+What's exposed.
+[Concrete enumeration of what can be read/accessed/triggered without credentials.
+Use bullet points for lists of resources, workspace names, endpoints, etc.]
+
+Why it matters.
+[Business/technical impact. What credentials, data, or execution capability is
+within blast radius. Chain to downstream systems.]
+
+What an attacker can do right now.
+[Specific actions. Verb-first. "Read X", "Trigger Y", "Discard Z". If requires
+auth, state that here and describe the realistic starting positions.]
+
+[Add additional context paragraphs as needed — e.g., "Why [qualifier] doesn't
+reduce impact", "Combined with Finding N", etc.]
+
+
+==============================================================
+Severity summary: CRITICAL xN | HIGH xN | MEDIUM xN | LOW xN | INFO xN
+Confirmed exploitable today: [Finding numbers, zero-credential findings]
+Requires authentication: [Finding numbers]
+Version-dependent: [Finding numbers]
+Architecture gaps: [Finding numbers]
+==============================================================

@@ -1,0 +1,236 @@
+Business Insider Data Engineering Cluster — Finding Breakdown
+34.111.184.20 / insider.engineering
+NuClide Research | 2026-05-28
+==============================================================
+
+
+FINDING 1: Atlantis Fully Unauthenticated — CRITICAL
+=====================================================
+
+What it is.
+Atlantis is a Terraform GitOps runner. When a developer opens a GitHub PR that
+touches infrastructure code, Atlantis detects the webhook, runs `terraform plan`,
+and posts the output as a PR comment. An authorized reviewer then comments
+`atlantis apply` to execute it. The entire flow — plan, apply, lock, unlock — is
+supposed to require authentication.
+
+`atlantis.test.data.insider.engineering` has no authentication at all. The web UI
+is fully open to any HTTP client with no credentials required.
+
+What's exposed.
+The homepage shows the complete live state of every active Terraform operation:
+- 5 active locks on businessinsider/data_eng_infra PR #1613, locked by
+  CMurphyInsiderInc on 2026-05-26
+- Workspace names: dataengineeringtest, snowflake-test, snowflake-prod,
+  snowflake-programmatic, data-eng-prod
+- Full jobs history listing every plan and apply operation with timestamps,
+  reaching back to at least PR #1607 (2026-05-20)
+- Jobs table reveals additional workspaces: bq-insider-admin and magnetic-hawk-*
+- Banner explicitly confirms: "Apply commands are enabled"
+
+Why workspace names matter.
+Each workspace corresponds to a set of Terraform resources that Atlantis has
+credentials to manage. bq-insider-admin means Atlantis holds a GCP service
+account key with BigQuery admin permissions — the permissions needed to
+create/modify datasets, tables, and IAM bindings across Business Insider's
+analytics warehouse. snowflake-prod means Atlantis holds a Snowflake account
+with write access to the production data warehouse. snowflake-programmatic is a
+service-account credential for programmatic Snowflake access — likely what
+pipelines use to load data. These aren't read-only credentials. Terraform creates
+and destroys infrastructure.
+
+What an attacker can do right now without any credentials.
+Discard an active plan lock. This is a one-click destructive action visible on the
+homepage. Discarding a lock on snowflake-prod while an engineer is in the middle
+of a PR review removes the mutual-exclusion gate on that environment. If another
+apply was queued, both could run simultaneously — Terraform concurrency against a
+shared state file causes corruption.
+
+Beyond that, if Atlantis' webhook receiver endpoint also lacks authentication (the
+/events POST endpoint that GitHub calls), an attacker can forge a webhook payload
+that looks like a PR comment containing `atlantis apply`. Atlantis would execute a
+Terraform apply against whichever workspace the forged payload specifies — with
+full execution credentials.
+
+Why "test" tier doesn't reduce impact.
+The hostname is atlantis.test but the workspace list includes snowflake-prod,
+data-eng-prod, and bq-insider-admin — production environments. Test-labeled
+Atlantis instances routinely manage production workspaces because organizations
+stand up a single runner for operational convenience. The workspace names are the
+ground truth; the subdomain is irrelevant.
+
+
+FINDING 2: GHSA-56px-hm34-xqj5 — Argo WorkflowTemplate Secret Disclosure — HIGH
+==================================================================================
+(version unconfirmed)
+
+What it is.
+A vulnerability in Argo Workflows versions 3.7.0 through 3.7.10 and 4.0.0
+through 4.0.1. The WorkflowTemplate API endpoint returns the full template object
+including any embedded secrets — environment variables, mounted secret references,
+service account tokens — when called with any bearer token. The token doesn't have
+to be valid. It doesn't have to correspond to a real user. A fabricated string like
+`Authorization: Bearer aaaa` satisfies the auth check.
+
+The endpoint.
+    GET /api/v1/workflow-templates/{namespace}/{name}
+
+Argo Workflows templates commonly contain:
+- AWS credentials passed as env vars (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+- GCP service account JSON key paths or inline key material
+- Database connection strings
+- API keys for external services
+
+On a data engineering cluster running Airflow, Airbyte, and vector search, the
+workflow templates are the glue that connects all those systems. The credentials
+embedded in those templates touch every upstream data source.
+
+Why it's unconfirmed here.
+GCP IAP sits in front of the entire Argo Workflows service, including routes that
+the Argo application itself treats as unconditionally public. IAP intercepts the
+request before it reaches the application and returns 403. The version string from
+/api/v1/version — which Argo always serves unauthenticated — is also 403. There's
+no way to confirm the version or test the endpoint without either a valid GCP
+identity token or a different attack path that bypasses IAP.
+
+If the version is in range.
+The IAP gate raises the bar. But IAP is an organizational control, not an
+architectural one. A compromised GCP service account, a misconfigured IAP bypass
+rule, or an insider with a valid identity token removes it. GHSA-56px-hm34-xqj5
+then becomes direct access to every secret embedded across all workflow templates
+in all namespaces.
+
+
+FINDING 3: CVE-2026-31892 — Argo podSpecPatch Node Escape — HIGH
+=================================================================
+(version unconfirmed, requires authentication)
+
+What it is.
+Also affects 3.7.0 through 3.7.10 / 4.0.0 through 4.0.1, fixed in 3.7.11 /
+4.0.2. This one requires authentication. An authenticated user with permission to
+create or modify WorkflowTemplates can inject arbitrary fields into the Kubernetes
+pod spec via the podSpecPatch field. The intended use is benign (e.g., set
+resource limits). The vulnerability is that there's no validation preventing
+injection of security-relevant fields.
+
+The chain.
+    podSpecPatch:
+      securityContext:
+        privileged: true
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+      volumeMounts:
+        - mountPath: /host
+          name: host-root
+
+This creates a pod that runs as root with full host filesystem access. From there:
+read node credentials from /host/etc/kubernetes/pki, access the kubelet API, and
+move laterally across the cluster.
+
+Combined with GHSA-56px-hm34-xqj5.
+If both vulnerabilities apply: first use the fake-token vuln to read secrets from
+existing templates (no auth required). Then use any harvested credential to
+authenticate and inject the podSpecPatch. The result is Kubernetes node compromise
+from a starting position of zero credentials.
+
+Why it's in the findings despite requiring auth.
+Insider threats, compromised developer credentials, and stolen GCP tokens are all
+realistic starting points for an organization of Business Insider's scale. A
+finding that requires auth but leads to node compromise remains high severity.
+
+
+FINDING 4: CVE-2024-53862 — Archived Workflow Auth Bypass — HIGH
+=================================================================
+(version-conditional: 3.5.7 and 3.5.8 only)
+
+What it is.
+Specific to Argo Workflows 3.5.7 and 3.5.8 only. The auth check was accidentally
+removed from the archived workflow retrieval endpoint. A spoofed or expired token
+is sufficient to retrieve archived workflow records. Less exploitable than
+GHSA-56px-hm34-xqj5 (archived workflows vs. live templates), but still exposes
+historical execution data including any secrets that appeared in workflow arguments
+or parameters at run time.
+
+Status here.
+Version unconfirmed. If the deployment is on 3.5.7 or 3.5.8, this applies. If
+3.7.x or 4.0.x, the other two CVEs are the relevant surface. The version range is
+narrow enough that the two CVE classes are largely mutually exclusive.
+
+
+FINDING 5: GCP IAP Partial Coverage — Architecture Gap
+=======================================================
+
+This isn't a traditional vulnerability but it's the most operationally significant
+pattern across the 18 hosts.
+
+What GCP IAP is.
+Identity-Aware Proxy is a Google Cloud service that gates access to a backend
+service based on the requester's Google identity and group membership. It sits at
+the load balancer level, before any request reaches the application. Every service
+protected by IAP returns an HTTP 302 or 403 with "Invalid IAP credentials"
+regardless of what the application itself would serve.
+
+The coverage gap.
+IAP is consistently applied to the production cluster and most test services.
+Atlantis is the exception. This means whoever deployed the cluster applied IAP as
+a group policy to the prod namespace and most of the test namespace, but Atlantis
+was either deployed after the policy was written, deployed with a different Helm
+chart that didn't inherit the annotation, or was explicitly excluded because IAP
+and the Atlantis webhook receiver have a tension (GitHub needs to POST to /events
+without a GCP identity, which requires either an exception or a separate
+unauthenticated path).
+
+The implication.
+IAP is doing real work. It's protecting Argo, Airflow, Airbyte, data-ops-api, and
+OPM from direct exploitation. The Atlantis miss is not a failure of IAP as a
+technology — it's a deployment gap. One service out of 17 wasn't covered, and it
+happened to be the one holding execution credentials for the entire data
+infrastructure.
+
+
+FINDING 6: 136.110.253.247 — Non-GCP Anomaly
+=============================================
+
+Every host in the data namespace resolves to a GCP IP in AS396982 (34.x.x.x
+addresses). One exception: data-ops-api.test.data.insider.engineering resolves to
+136.110.253.247. That block is not GCP.
+
+Why it matters.
+The entire cluster is behind GCP's network perimeter with consistent IAP controls
+applied. A non-GCP host doesn't inherit those controls and may not have IAP at
+all. If data-ops-api.test is running on an unmanaged VPS or a different cloud
+provider without the same IAP policy, the auth assumption doesn't hold. The cert
+for this host is also unknown — it wasn't in the VisorGraph output for the main
+cluster.
+
+Status.
+ASN unattributed. Cert not confirmed. Auth state not confirmed. It's a blank spot
+in a map that's otherwise well-charted.
+
+
+FINDING 7: opm-dev.prod — Dev Instance in Production Namespace
+===============================================================
+
+opm-dev.prod.data.insider.engineering runs a dev-labeled OPM instance in the
+production namespace. GCP IAP is present, so it's not directly exploitable at
+this moment.
+
+Why it's flagged.
+Dev instances in production namespaces indicate staging discipline gaps. Dev
+configurations typically have weaker internal access controls, more verbose logging
+(sometimes logging request bodies including credentials), more permissive CORS
+policies, and debug endpoints enabled. If IAP is ever misconfigured or bypassed, a
+dev instance in the prod namespace is the first target because it's the most likely
+to have reduced hardening. It also shares the prod namespace's IAM bindings and
+network policy, meaning a compromised dev instance has the same blast radius as a
+compromised prod instance.
+
+
+==============================================================
+Severity summary: CRITICAL x1 | HIGH x3 | INFO x3
+Confirmed exploitable today: Finding 1 (Atlantis, zero credentials required)
+Version-dependent: Findings 2, 3, 4 (Argo CVEs, GCP IAP blocking version probe)
+Architecture gaps: Findings 5, 6, 7
+==============================================================
