@@ -1,66 +1,107 @@
 # OSINT Platoon
 
-Multi-agent OSINT system structured on US Army ATP 3-21.8 infantry platoon doctrine.
+Multi-agent OSINT framework built to run natively inside **Claude Code**. Squads are Claude Code `Agent` tool subagents — not subprocess calls, not API wrappers. The orchestrator dispatches parallel agents from inside an active Claude Code session, collects SPOT reports, and synthesizes a SALUTE final product.
+
+Structured on US Army ATP 3-21.8 infantry platoon doctrine.
+
+---
+
+## How It Actually Works
+
+This runs **inside Claude Code** as an agentic session. Not a standalone scanner you pipe targets into.
+
+1. Open Claude Code (`claude`) in this directory
+2. Hand the orchestrator a target IP, domain, or operator name
+3. The orchestrator dispatches 3-4 parallel `Agent` subagents (squads)
+4. Squads return SPOT reports; orchestrator synthesizes the SALUTE
+5. Full NuClide arsenal runs against the target (aimap, VisorGraph, BARE, VisorLog, etc.)
+
+The `platoon/` directory contains squad prompt templates. `cli.py` is a standalone fallback for non-interactive use — the agentic path is the primary one.
+
+---
 
 ## Architecture
 
 ```
-Platoon Leader (Orchestrator) — claude-opus-4-7, adaptive thinking
-  ├── Squad Alpha    — Web Recon (news, mentions, breach data, paste sites)
-  ├── Squad Bravo    — Infrastructure (DNS, WHOIS, crt.sh, ASN attribution)
-  ├── Squad Charlie  — Social Footprint (usernames, profiles, cross-platform)
-  └── Weapons Squad  — Document Intel (PDF/DOCX metadata, author leaks)
+Claude Code Session (Orchestrator)
+  │
+  ├── Agent: Squad Alpha    — Web recon (news, mentions, breach data, paste sites)
+  ├── Agent: Squad Bravo    — Infrastructure (DNS, WHOIS, crt.sh, ASN, cert pivots)
+  ├── Agent: Squad Charlie  — Social footprint (usernames, profiles, cross-platform)
+  └── Agent: Weapons Squad  — Document intel + full NuClide arsenal chain
 ```
 
-**Doctrinal basis:** 8-Step Troop Leading Procedures (TLP), METT-TC(I) analysis, SPOT reports, SALUTE final product, base-of-fire + bounding movement execution pattern.
+Squads run in parallel via the Claude Code `Agent` tool. Each returns a **SPOT report** (Size / Activity / Location / Unit / Time / Equipment mapped to OSINT fields). Orchestrator synthesizes all four into a **SALUTE** final product and replans based on discovered pivots.
 
-**Execution pattern:** Alpha + Charlie run in parallel (base of fire). Bravo bounds off Alpha's domain pivots. Weapons synthesizes across all three. Orchestrator replans after each iteration using discovered pivots.
+**Doctrinal basis:** ATP 3-21.8 Troop Leading Procedures, METT-TC(I), base-of-fire + bounding movement execution, CCIR/PIR tasking, GOTWA handoffs.
 
-## Install
+---
+
+## NuClide Arsenal Integration
+
+Every target runs the full 9-step chain:
+
+| Step | Tool | Purpose |
+|------|------|---------|
+| 0 | JAXEN | Shodan harvest → empire.db |
+| 1 | aimap | Service fingerprint + deep enum (36 AI/ML services) |
+| 2 | VisorGraph | Cert pivot → operator attribution |
+| 3 | aimap-profile | Target classification + ethics flags |
+| 4 | JS-bundle | Hidden API / secret extraction |
+| 5 | VisorLog | Ledger ingest → nuclide.db |
+| 6 | VisorScuba | Compliance scoring |
+| 7 | BARE | Module relevance ranking (3,904 Metasploit entries) |
+| 8 | VisorCorpus | Corpus analysis (LLM-adjacent surfaces) |
+
+Null result = result. Every step runs; none are conditional.
+
+---
+
+## Case Studies
+
+Real research outputs from live Claude Code agentic sessions:
+
+| Target | Operator | Findings |
+|--------|----------|---------|
+| [`34_111_184_20/`](34_111_184_20/) | Business Insider / Insider Inc. (Axel Springer) | CRITICAL: Atlantis v0.32.0 unauthenticated Terraform runner. 5 active production locks (Snowflake, BigQuery admin, data-eng-prod) fully readable and discardable without credentials. Disclosed 2026-05-28. |
+| [`5_78_67_23/`](5_78_67_23/) | Voomi Supply LLC | CRITICAL: Elasticsearch superuser credentials in plaintext Temporal workflow schedule configs. Unauthenticated Temporal UI. Blast radius covers Walmart + Amazon catalog pipelines. Disclosed 2026-05-28. |
+
+Each case study directory contains:
+- `case-study.md` — SALUTE report with operator profile, arsenal chain status, squad SPOT summary
+- `findings-breakdown.txt` — plain-English per-finding breakdown (business impact, attack paths, what an attacker can do right now)
+- `poc.txt` — reproducible PoCs with expected output
+- `screenshots/` — visual evidence
+
+---
+
+## Standalone CLI (Fallback)
+
+For use outside Claude Code:
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-# add your ANTHROPIC_API_KEY to .env
-```
+# add ANTHROPIC_API_KEY
 
-## Usage
-
-```bash
-# Domain recon
 python cli.py --target example.com --type domain --depth deliberate
-
-# Person / username
-python cli.py --target "Jane Doe" --type person --depth hasty
-
-# Deep multi-iteration
-python cli.py --target example.com --type domain --depth detailed --max-iterations 3
-
-# Dry run — METT-TC plan without dispatching squads
-python cli.py --target example.com --dry-run
+python cli.py --target 1.2.3.4 --type ip --depth detailed
+python cli.py --target example.com --dry-run   # METT-TC plan only
 ```
+
+---
 
 ## Output
 
-- Console: SALUTE report (Subject / Activity / Location / Unit / Time / Exposure)
-- `reports/SALUTE_{target}_{timestamp}.md` — full report
+- `reports/SALUTE_{target}_{timestamp}.md` — final intelligence product
 - `logs/mission_{id}.jsonl` — structured mission log with token usage
+- `{target_slug}/case-study.md` — full case study (agentic sessions)
+- `{target_slug}/findings-breakdown.txt` — per-finding deliverable
 
-## Squads
-
-| Squad   | Mission                            | Model           | Tools                   |
-|---------|------------------------------------|-----------------|-------------------------|
-| Alpha   | Web recon, breach data, paste sites| claude-sonnet-4-6 | web_search            |
-| Bravo   | DNS, WHOIS, crt.sh, ASN            | claude-sonnet-4-6 | web_search + dnspython |
-| Charlie | Social footprint, username enum    | claude-sonnet-4-6 | web_search            |
-| Weapons | PDF/DOCX metadata extraction       | claude-sonnet-4-6 | web_search + httpx     |
-
-## SPOT / SALUTE Schema
-
-Each squad returns a **SPOT report** (Size, Activity, Location, Unit, Time, Equipment mapped to OSINT fields). The Orchestrator synthesizes all SPOT reports into a **SALUTE report** — the final intelligence product.
+---
 
 ## Rules of Engagement
 
-- Passive collection only — no logins, no form submissions, no active scanning
-- Public data only — web search, DNS queries, CT logs, public APIs
-- Documents fetched only if publicly indexed (appear in search results)
+- Passive collection and open-surface enumeration only
+- No logins, no form submissions, no destructive operations
+- Stop short of full impact once a finding is proven
+- Disclose responsibly
