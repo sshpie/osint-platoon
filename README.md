@@ -6,15 +6,67 @@ Structured on US Army ATP 3-21.8 infantry platoon doctrine.
 
 ---
 
+## Using with Claude Code
+
+### Setup
+
+```bash
+git clone https://github.com/Nicholas-Kloster/osint-platoon
+cd osint-platoon
+claude   # open Claude Code in this directory
+```
+
+That's it. No API key config, no pip install for the agentic path. Claude Code is the runtime.
+
+### Running an assessment
+
+Inside your Claude Code session, hand it a target:
+
+```
+run the osint platoon on 1.2.3.4
+```
+
+```
+run the osint platoon on example.com
+```
+
+```
+run the osint platoon on "Acme Corp"
+```
+
+Claude Code acts as the orchestrator. It reads the squad templates from `platoon/squads/`, dispatches Alpha / Bravo / Charlie / Weapons as parallel `Agent` subagents, and synthesizes their SPOT reports into a SALUTE final product. The full NuClide arsenal chain runs as part of the Weapons squad pass.
+
+### What Claude Code does automatically
+
+- Dispatches squads in parallel (base-of-fire + bounding movement pattern)
+- Replans after each iteration based on discovered pivots
+- Writes `{target_slug}/case-study.md` and `findings-breakdown.txt` as deliverables
+- Runs all 9 arsenal steps — null results logged, nothing silently skipped
+- Captures screenshots and PoC evidence for any confirmed findings
+
+### Depth control
+
+Tell Claude Code the depth in your prompt:
+
+| Phrase | Behavior |
+|--------|----------|
+| `hasty` | Single-pass, fast — web + infra only |
+| `deliberate` | Full squad dispatch, one iteration |
+| `detailed` | Full squads, up to 3 replan iterations |
+
+Default when unspecified is `deliberate`.
+
+### Tips
+
+- Run from the repo root so relative paths resolve correctly
+- If a squad comes back with a pivot (new IP, new domain, cert chain), say `follow the pivot on X` and Claude Code will re-task Bravo off it
+- The `--dry-run` flag on `cli.py` prints the METT-TC plan without dispatching squads — useful for previewing tasking before a live run
+
+---
+
 ## How It Actually Works
 
-This runs **inside Claude Code** as an agentic session. Not a standalone scanner you pipe targets into.
-
-1. Open Claude Code (`claude`) in this directory
-2. Hand the orchestrator a target IP, domain, or operator name
-3. The orchestrator dispatches 3-4 parallel `Agent` subagents (squads)
-4. Squads return SPOT reports; orchestrator synthesizes the SALUTE
-5. Full NuClide arsenal runs against the target (aimap, VisorGraph, BARE, VisorLog, etc.)
+Squads are Claude Code `Agent` tool subagents — not subprocess calls, not API wrappers. The orchestrator dispatches parallel agents from inside the active Claude Code session, collects SPOT reports, and synthesizes the SALUTE final product.
 
 The `platoon/` directory contains squad prompt templates. `cli.py` is a standalone fallback for non-interactive use — the agentic path is the primary one.
 
