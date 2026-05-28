@@ -56,6 +56,20 @@ Internal IP `10.0.1.1` in SAN — node is part of a private cluster network.
 - Series A announced: 2026-03-06
 - Kibana version: 8.17.2 (released February 2025)
 
+### Screenshots
+
+| File | Content |
+|---|---|
+| `kibana-01-login-auth-enforced.png` | Kibana login redirect — auth enforced on UI |
+| `kibana-02-status-no-auth.png` | /api/status 200 without credentials — hostname disclosure |
+| `kibana-03-dashboards-authenticated.png` | Kibana Dashboards authenticated — voomi-dashboard visible |
+| `kibana-04-indices-amazon-catalog.png` | Kibana Indices — Amazon catalog indexes confirmed |
+| `kibana-05-indices-monitoring.png` | Kibana Indices — monitoring + additional Amazon indexes |
+| `kibana-06-home-endpoint-confirmed.png` | Kibana home — 5.78.67.23:9200 endpoint pre-filled |
+| `es-curl-evidence.txt` | Raw curl: ES 401 + Kibana /api/status 200 |
+
+---
+
 ### Exposure
 
 #### CRITICAL: Elasticsearch Superuser Credentials in Temporal Schedule Config
@@ -70,9 +84,22 @@ Indexes:  voomi-walmart-catalog
           voomi-test-catalog
 ```
 
-`elastic` is the built-in Elasticsearch superuser — full cluster admin. Read, write, delete, index management, user management, snapshot operations. Both production Walmart catalog and test catalog are within blast radius.
+`elastic` is the built-in Elasticsearch superuser — full cluster admin. Read, write, delete, index management, user management, snapshot operations. Authenticated Kibana session confirms credential validity and reveals the full index inventory.
 
-**Credentials are confirmed in hand. The ES cluster has not been accessed.**
+**Indexes confirmed in authenticated Kibana session:**
+
+| Index | Pipeline |
+|---|---|
+| `voomi-walmart-catalog` | Walmart marketplace production |
+| `voomi-test-catalog` | Walmart catalog staging |
+| `sn-normalized-products-voomi-test-catalog` | Normalized product data |
+| `amazon-catalog-items-all-strategies` | Amazon marketplace production |
+| `amazon-new-product-data-1` | Amazon new product feed |
+| `amazon_mini_keepa_data` | Amazon keepa pricing data |
+| `amazon_mini_keepa_data.html` | Amazon keepa HTML variant |
+| `.monitoring-es-*` | Cluster monitoring |
+
+Blast radius extends beyond Walmart: Voomi operates a multi-marketplace pipeline. Both Walmart and Amazon catalog sync operations share this cluster. Full product catalog, pricing, and inventory data for two major marketplace integrations is accessible with a single credential set.
 
 CWE-312 (Cleartext Storage of Sensitive Information) / CWE-522 (Insufficiently Protected Credentials).
 

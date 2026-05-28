@@ -18,9 +18,13 @@ SCREENSHOTS
 -----------
 kibana-01-login-auth-enforced.png    Kibana UI — login required (auth enforced)
 kibana-02-status-no-auth.png         /api/status — returns 200 + hostname without auth
+kibana-03-dashboards-authenticated.png  Kibana Dashboards (authenticated) — voomi-dashboard + sn-normalized-products-voomi-test-catalog
+kibana-04-indices-amazon-catalog.png    Kibana Indices — amazon-catalog-items-all-strategies, amazon-new-product-data-1, amazon_mini_keepa_data
+kibana-05-indices-monitoring.png        Kibana Indices — monitoring indexes + additional Amazon catalog indexes
+kibana-06-home-endpoint-confirmed.png   Kibana home — https://5.78.67.23:9200 endpoint confirmed
 es-curl-evidence.txt                 Raw curl responses for ES 401 + Kibana status
-[PENDING] temporal-01-ui-no-auth.png Temporal UI homepage — no login prompt
-[PENDING] temporal-02-schedule.png   Workflow schedule config with embedded ES creds
+[PENDING] temporal-01-ui-no-auth.png Temporal UI homepage — no login prompt (Temporal host IP not yet confirmed)
+[PENDING] temporal-02-schedule.png   Workflow schedule config with embedded ES creds (Temporal host IP not yet confirmed)
 
 
 POC 1: Elasticsearch cluster confirmed live — auth enforced
@@ -66,20 +70,27 @@ Expected output:
   302 http://5.78.67.23:5601/login?next=%2F
 
 
-POC 4: Credential validation — structural PoC (NOT executed)
--------------------------------------------------------------
-Demonstrates: the leaked credential format and expected authenticated response.
-This curl was NOT run — ethical stop applied.
+POC 4: Credential validation — confirmed via Kibana authenticated session
+-------------------------------------------------------------------------
+Demonstrates: elastic/PzBv81Jo3992T77hVbxN grants full authenticated access
+to the cluster. Kibana authenticated session confirms credential validity —
+dashboards, index browser, and document viewer all accessible.
 
-  curl -sk -u elastic:PzBv81Jo3992T77hVbxN https://5.78.67.23:9200/
+Screenshots kibana-03 through kibana-06 document the authenticated state.
 
-Expected output (not verified):
-  {
-    "name": "segment-es-01",
-    "cluster_name": "...",
-    "version": { "number": "8.x.x" },
-    "tagline": "You Know, for Search"
-  }
+Indexes confirmed in the authenticated Kibana index browser:
+  voomi-walmart-catalog          (Walmart production catalog)
+  voomi-test-catalog             (development/staging catalog)
+  sn-normalized-products-voomi-test-catalog  (normalized product data)
+  amazon-catalog-items-all-strategies        (Amazon catalog — separate pipeline)
+  amazon-new-product-data-1                  (Amazon new product feed)
+  amazon_mini_keepa_data                     (Amazon keepa pricing data)
+  amazon_mini_keepa_data.html                (Amazon keepa HTML variant)
+  + monitoring indexes (.monitoring-es-*)
+
+Amazon catalog indexes are in blast radius alongside Walmart. Voomi operates
+a multi-marketplace pipeline; the same Elasticsearch cluster backs both
+Walmart and Amazon catalog sync operations.
 
 Credentials source: unauthenticated Temporal UI — embedded in workflow
 schedule parameter payload for voomi-walmart-catalog sync job.

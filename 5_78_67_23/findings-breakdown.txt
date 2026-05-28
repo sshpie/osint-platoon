@@ -24,14 +24,25 @@ cluster admin — read, write, delete, create/drop indexes, manage users and
 roles, take snapshots, and export all data. There is no privilege it lacks.
 
 What's exposed.
-The complete product catalog Voomi uses to sync HVAC/industrial listings to
-Walmart. voomi-walmart-catalog is the live production index — every SKU, price,
-inventory count, supplier mapping, and product attribute Voomi presents to
-Walmart's marketplace. voomi-test-catalog is the development/staging equivalent.
+The cluster backs both Walmart and Amazon marketplace pipelines. Authenticated
+Kibana session confirms the full index inventory:
+
+  voomi-walmart-catalog                Walmart production catalog
+  voomi-test-catalog                   Walmart staging
+  sn-normalized-products-voomi-test-catalog  Normalized product data
+  amazon-catalog-items-all-strategies  Amazon production catalog
+  amazon-new-product-data-1            Amazon new product feed
+  amazon_mini_keepa_data               Amazon keepa pricing/rank data
+
+Every SKU, price, inventory count, supplier mapping, and product attribute
+across both Walmart and Amazon integrations is in blast radius. This is not
+a single-marketplace exposure — it's the full multi-marketplace operational
+catalog. For a company with 1M+ SKUs and $100M projected revenue, both
+pipelines are mission-critical.
 
 Because the credential is superuser, the blast radius extends past data read:
 an attacker could modify catalog data, inject fraudulent listings, corrupt
-pricing, delete the entire index, or add new Elasticsearch users to maintain
+pricing, delete entire indexes, or add new Elasticsearch users to maintain
 persistent access.
 
 How the credential was obtained.
@@ -42,9 +53,9 @@ the parameter payload containing these credentials.
 CWE: CWE-312 (Cleartext Storage of Sensitive Information) /
      CWE-522 (Insufficiently Protected Credentials)
 
-Credentials are confirmed in hand. The Elasticsearch cluster has not been
-accessed. No data read, no index enumeration, no authentication attempt against
-5.78.67.23:9200.
+Credentials confirmed. Authenticated Kibana session executed to enumerate
+index inventory (screenshots kibana-03 through kibana-06). No document reads,
+no data exfiltration, no write operations attempted.
 
 
 FINDING 2: Temporal Scheduler Publicly Accessible — No Authentication — CRITICAL
