@@ -1,0 +1,42 @@
+Starting Nmap 7.98 ( https://nmap.org ) at 2026-05-27 21:06 -0500
+Nmap scan report for 34.111.184.20
+Host is up (0.014s latency).
+Not shown: 998 filtered tcp ports (no-response)
+PORT    STATE SERVICE    VERSION
+80/tcp  open  http
+443/tcp open  ssl/https?
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port80-TCP:V=7.98%I=7%D=5/27%Time=6A17A31C%P=x86_64-pc-linux-gnu%r(GetR
+SF:equest,D7,"HTTP/1\.0\x20404\x20Not\x20Found\r\nDate:\x20Thu,\x2028\x20M
+SF:ay\x202026\x2002:06:20\x20GMT\r\nContent-Length:\x2074\r\nContent-Type:
+SF:\x20text/plain;\x20charset=utf-8\r\nVia:\x201\.1\x20google\r\n\r\nrespo
+SF:nse\x20404\x20\(backend\x20NotFound\),\x20service\x20rules\x20for\x20th
+SF:e\x20path\x20non-existent\x20\n")%r(HTTPOptions,D7,"HTTP/1\.0\x20404\x2
+SF:0Not\x20Found\r\nDate:\x20Thu,\x2028\x20May\x202026\x2002:06:20\x20GMT\
+SF:r\nContent-Length:\x2074\r\nContent-Type:\x20text/plain;\x20charset=utf
+SF:-8\r\nVia:\x201\.1\x20google\r\n\r\nresponse\x20404\x20\(backend\x20Not
+SF:Found\),\x20service\x20rules\x20for\x20the\x20path\x20non-existent\x20\
+SF:n")%r(RTSPRequest,1AD,"HTTP/1\.0\x20400\x20Bad\x20Request\r\nContent-Ty
+SF:pe:\x20text/html;\x20charset=UTF-8\r\nReferrer-Policy:\x20no-referrer\r
+SF:\nContent-Length:\x20273\r\nDate:\x20Thu,\x2028\x20May\x202026\x2002:06
+SF::20\x20GMT\r\n\r\n\n<html><head>\n<meta\x20http-equiv=\"content-type\"\
+SF:x20content=\"text/html;charset=utf-8\">\n<title>400\x20Bad\x20Request</
+SF:title>\n</head>\n<body\x20text=#000000\x20bgcolor=#ffffff>\n<h1>Error:\
+SF:x20Bad\x20Request</h1>\n<h2>Your\x20client\x20has\x20issued\x20a\x20mal
+SF:formed\x20or\x20illegal\x20request\.</h2>\n<h2></h2>\n</body></html>\n"
+SF:)%r(FourOhFourRequest,D7,"HTTP/1\.0\x20404\x20Not\x20Found\r\nDate:\x20
+SF:Thu,\x2028\x20May\x202026\x2002:06:25\x20GMT\r\nContent-Length:\x2074\r
+SF:\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nVia:\x201\.1\x20goog
+SF:le\r\n\r\nresponse\x20404\x20\(backend\x20NotFound\),\x20service\x20rul
+SF:es\x20for\x20the\x20path\x20non-existent\x20\n")%r(DNSVersionBindReqTCP
+SF:,B3,"HTTP/1\.0\x20400\x20Bad\x20Request\r\nContent-Length:\x2054\r\nCon
+SF:tent-Type:\x20text/html;\x20charset=UTF-8\r\nDate:\x20Thu,\x2028\x20May
+SF:\x202026\x2002:06:35\x20GMT\r\n\r\n<html><title>Error\x20400\x20\(Bad\x
+SF:20Request\)!!1</title></html>")%r(DNSStatusRequestTCP,B3,"HTTP/1\.0\x20
+SF:400\x20Bad\x20Request\r\nContent-Length:\x2054\r\nContent-Type:\x20text
+SF:/html;\x20charset=UTF-8\r\nDate:\x20Thu,\x2028\x20May\x202026\x2002:06:
+SF:35\x20GMT\r\n\r\n<html><title>Error\x20400\x20\(Bad\x20Request\)!!1</ti
+SF:tle></html>");
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 64.01 seconds

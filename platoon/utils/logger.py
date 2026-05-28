@@ -8,9 +8,9 @@ _instance: MissionLogger | None = None
 
 
 class MissionLogger:
-    def __init__(self, mission_id: str = ""):
+    def __init__(self, mission_id: str = "", log_dir: str = "logs"):
         self.mission_id = mission_id or datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        self.log_path = Path(f"logs/mission_{self.mission_id}.jsonl")
+        self.log_path = Path(f"{log_dir}/mission_{self.mission_id}.jsonl")
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self._token_total = 0
 
@@ -35,9 +35,9 @@ class MissionLogger:
                  cost_usd=round(cost, 4), cumulative_usd=round(self._token_total, 4))
 
 
-def init_logger(mission_id: str = "") -> MissionLogger:
+def init_logger(mission_id: str = "", log_dir: str = "logs") -> MissionLogger:
     global _instance
-    _instance = MissionLogger(mission_id)
+    _instance = MissionLogger(mission_id=mission_id, log_dir=log_dir)
     return _instance
 
 

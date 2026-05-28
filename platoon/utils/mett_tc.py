@@ -5,34 +5,33 @@ from platoon.models.tasking import MissionTasking, SquadTasking
 from platoon.utils.claude_runner import run_claude
 
 METT_TC_PROMPT = """\
-You are the Platoon Leader of an OSINT research unit operating under ATP 3-21.8 doctrine.
+You are a research mission planner. Conduct a METT-TC(I) situational analysis for the assigned subject, \
+then issue prioritized team tasking.
 
-Conduct a METT-TC(I) analysis for the assigned mission, then issue prioritized squad tasking.
-
-Available squads:
-- Alpha: Web recon — news, mentions, public records, breach data, paste sites
-- Bravo: Domain/IP/Infra — DNS, WHOIS, cert transparency, ASN attribution
-- Charlie: Social footprint — username enumeration, public profiles, linked accounts
-- Weapons: Document intel — public PDFs/docs, metadata extraction
+Available research teams:
+- alpha: Web — news coverage, mentions, public records, public data repositories
+- bravo: Infrastructure — DNS records, WHOIS, certificate data, network attribution
+- charlie: Social — public profiles, linked accounts, organization mapping
+- weapons: Documents — published PDFs, technical docs, metadata from public files
 
 Output structure:
 1. Full METT-TC(I) analysis (prose)
-2. Intelligence requirements — CCIR and PIRs
-3. Prioritized squad tasking as valid JSON block:
+2. Key research questions — CCIR (thesis) and PIRs (specific questions)
+3. Prioritized team tasking as valid JSON block:
 
 ```json
 {
-  "ccir": "one-sentence research thesis — what this mission must answer",
+  "ccir": "one-sentence research thesis",
   "pirs": ["specific verifiable question 1", "specific verifiable question 2"],
   "squad_tasks": [
     {
       "squad": "alpha",
       "objective": "...",
-      "targets": ["target1", "target2"],
+      "targets": ["target1"],
       "priority": 1,
       "weapons_control": "tight",
-      "disengagement_criteria": ["target returns 429", "suspected honeypot signal"],
-      "bypass_criteria": ["already enumerated this session"],
+      "disengagement_criteria": ["source returns 429", "requires login"],
+      "bypass_criteria": ["already covered this session"],
       "actions_on_contact": "report and hold"
     },
     {"squad": "bravo", "objective": "...", "targets": ["target1"], "priority": 1},
@@ -42,10 +41,8 @@ Output structure:
 }
 ```
 
-Priority: 1=immediate, 2=follow-on, 3=if time permits
-Weapons control: hold=only if ordered, tight=confirmed targets only, free=any non-friendly
-All squads operate in RECON mode (passive, read-only) unless explicitly authorized otherwise.
-Disengagement criteria: pre-defined conditions that halt a squad without orchestrator consultation.
+Priority: 1=immediate, 2=follow-on, 3=if time permits.
+All teams are read-only and passive — no logins, no form submissions.
 """
 
 
@@ -55,22 +52,21 @@ async def run_mett_tc_analysis(
     depth: str,
 ) -> tuple[str, MissionTasking]:
     mission_input = f"""\
-MISSION ORDER
+RESEARCH ORDER
 
-Target: {target}
-Target Type: {target_type}
-Assessment Depth: {depth.upper()}
+Subject: {target}
+Subject Type: {target_type}
+Depth: {depth.upper()}
 
-Conduct METT-TC(I) analysis:
-- Mission: What intelligence are we collecting and why?
-- Enemy (Target): What do we already know about {target}?
-- Terrain: What attack surfaces are in scope? (web presence, DNS/infra, social, documents)
-- Troops: Which squads are most valuable given target type?
-- Time: {depth} depth — calibrate thoroughness accordingly.
-- Civil/Info: Any ethical/legal constraints on this target type?
+Situational analysis:
+- Mission: What are we researching and why?
+- Subject: What is known about {target}?
+- Terrain: What public-facing surfaces exist? (web, DNS/network, social, documents)
+- Troops: Which research teams fit this subject type?
+- Time: {depth} depth — calibrate scope.
+- Constraints: Any scope limitations for this subject type?
 
-State the CCIR (one-sentence research thesis) and 3-5 specific PIRs.
-Issue prioritized squad tasking with disengagement criteria."""
+Provide CCIR (research thesis) and 3-5 PIRs. Issue team tasking."""
 
     analysis_text = await run_claude(
         mission_input,
