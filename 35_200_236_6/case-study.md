@@ -116,17 +116,21 @@ The inference service on :4000 references an MCP backend for stage and prod envi
 | Step | Tool | Result |
 |---|---|---|
 | 0 | JAXEN | Not run — manual squad dispatch |
-| 1 | aimap | Pending (Weapons squad background run) |
-| 2 | VisorGraph | Pending |
-| 3 | aimap-profile | Healthcare AI target — HIPAA-adjacent, India DPDP, children's data |
-| 4 | JS-bundle | Not run this pass |
-| 5 | VisorLog | Pending ingest |
-| 6 | VisorScuba | Pending |
-| 7 | BARE | Pending |
-| 8 | VisorCorpus | LightRAG + MCP = LLM-adjacent surface |
-| + | Shodan | Ports 22/4000/8000/9000 confirmed; no vuln tags |
+| 1 | aimap | Ports 4000/8000/9000 confirmed open HTTP 200. Port 9000 fingerprinted ZenML (false positive — confirmed Video RAG Search API via body). All three Uvicorn services confirmed live. aimap output ingested to nuclide.db. |
+| 2 | VisorGraph | Not run — no TLS cert on any open port, no pivot surface |
+| 3 | aimap-profile | Healthcare AI, children's data, India DPDP Act — sensitive personal data classification |
+| 4 | JS-bundle | Not run — no web frontend surface on any open port |
+| 5 | VisorLog | Ingested: 1 event (2 deduped) from aimap report |
+| 6 | VisorScuba | Run — 35.200.236.6 not yet scored (ZenML fingerprint, no AI.C1 match) |
+| 7 | BARE | Run. Low semantic scores across all 3 findings (0.37-0.43) — no strong Metasploit module match for novel FastAPI/LightRAG inference exposure. No MSF coverage for this finding class. |
+| 8 | VisorCorpus | LightRAG + MCP backend = LLM-adjacent surface. Not run. |
+| + | Shodan | Ports 22/4000/8000/9000 confirmed; open-dir tag present; no vuln tags |
 | + | crt.sh | 502 during window — no cert pivot data |
 | + | GreyNoise | RIOT=true, benign classification |
+
+**BARE note:** Best match for F2 (LightRAG) was `exploits_multi_http_apache_apisix_api_default_token_rce` (0.37) — semantic overlap on "unauthenticated API default token." Not applicable. No Metasploit coverage for unauth LightRAG or FastAPI inference endpoints. Novel finding class.
+
+**aimap note:** Port 9000 fingerprinted as ZenML via `/health` endpoint match — false positive. Actual service is the Video RAG Search API. aimap v1.9.36 ZenML fingerprint fires on any `/health` returning 200 JSON.
 
 ---
 
