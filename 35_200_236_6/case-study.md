@@ -121,7 +121,7 @@ The inference service on :4000 references an MCP backend for stage and prod envi
 | 3 | aimap-profile | Healthcare AI, children's data, India DPDP Act — sensitive personal data classification |
 | 4 | JS-bundle | Not run — no web frontend surface on any open port |
 | 5 | VisorLog | Ingested: 1 event (2 deduped) from aimap report |
-| 6 | VisorScuba | Run — 35.200.236.6 not yet scored (ZenML fingerprint, no AI.C1 match) |
+| 6 | VisorScuba | **0/10 — AI.C1 violation** (unauthenticated AI service confirmed) |
 | 7 | BARE | Run. Low semantic scores across all 3 findings (0.37-0.43) — no strong Metasploit module match for novel FastAPI/LightRAG inference exposure. No MSF coverage for this finding class. |
 | 8 | VisorCorpus | LightRAG + MCP backend = LLM-adjacent surface. Not run. |
 | + | Shodan | Ports 22/4000/8000/9000 confirmed; open-dir tag present; no vuln tags |
@@ -134,13 +134,29 @@ The inference service on :4000 references an MCP backend for stage and prod envi
 
 ---
 
+## Additional Confirmed Intelligence (Weapons Squad)
+
+**S3 bucket: `pukaarcry.s3.ap-south-1.amazonaws.com`**
+Port 9000 Video RAG search returns live direct S3 object URLs for expert pediatric videos. Bucket not publicly listable but objects served through the unauthenticated search API. Confirms operator brand: PukaarCry. AWS ap-south-1 (Mumbai) — consistent with GCP asia-south1 backend.
+
+**LightRAG clinical knowledge base confirmed live**
+Port 8000 queried — RAG index loaded with real pediatric clinical content: meningitis, sepsis, pneumonia, dehydration protocols, neonatal hepatitis, blood culture differentials. Functioning clinical decision-support knowledge base, queryable without credentials.
+
+**SSH confirmed: OpenSSH 9.2p1 Debian-2+deb12u10 — publickey auth only.** No password auth. Current patch level.
+
+**WireGuard UDP candidates: 51819-51821 open/filtered** — likely internal VPN/service mesh. Not directly exploitable without peer keys.
+
+**menlohunt:** Ran — missed ports 4000/8000 (not in default 29-port list). Port 9000 flagged as MinIO (false positive). No GCS/Firebase/Cloud Run misconfigs. Coverage gap: menlohunt + aimap are complementary on non-standard ports.
+
+**VisorScuba: 0/10 — AI.C1 violation** (unauthenticated AI service). Ingested to nuclide.db.
+
 ## Intelligence Gaps
 
 - MCP backend host not yet located — adjacent /28 sweep (35.200.236.0/28) is next move
-- Weapons squad running in background — aimap/BARE results pending
 - crt.sh 502 — no cert SAN pivot; re-run needed
 - ThreatBook: 2 expired intels flagged but content gated behind auth
 - No GitHub org found — source code not accessible
+- S3 bucket `pukaarcry` — direct object URL pattern analysis pending (V021 pattern observed)
 
 ---
 
