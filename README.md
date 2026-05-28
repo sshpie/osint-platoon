@@ -1,27 +1,3 @@
-```
-   |\                |\                |\                |\
-   || .---.          || .---.          || .---.          || .---.
-   ||/_____\         ||/_____\         ||/_____\         ||/_____\
-   ||( '.' )         ||( '.' )         ||( '.' )         ||( '.' )
-   || \_-_/_         || \_-_/_         || \_-_/_         || \_-_/_
-   :-"`'V'//-.       :-"`'V'//-.       :-"`'V'//-.       :-"`'V'//-.
-  / ,   |// , `\    / ,   |// , `\    / ,   |// , `\    / ,   |// , `\
- / /|Ll //Ll|| |   / /|Ll //Ll|| |   / /|Ll //Ll|| |   / /|Ll //Ll|| |
-/_/||__//   || |  /_/||__//   || |  /_/||__//   || |  /_/||__//   || |
-\ \/---|[]==|| |  \ \/---|[]==|| |  \ \/---|[]==|| |  \ \/---|[]==|| |
- \/\__/ |   \| |   \/\__/ |   \| |   \/\__/ |   \| |   \/\__/ |   \| |
- /\|_   | Ll_\ |   /|/_   | Ll_\ |   /|/_   | Ll_\ |   /|/_   | Ll_\ |
- `--|`^"""^`||_|   `--|`^"""^`||_|   `--|`^"""^`||_|   `--|`^"""^`||_|
-    |   |   ||/       |   |   ||/       |   |   ||/       |   |   ||/
-    |   |   |         |   |   |         |   |   |         |   |   |
-    |   |   |         |   |   |         |   |   |         |   |   |
-    |   |   |         |   |   |         |   |   |         |   |   |
-    L___l___J         L___l___J         L___l___J         L___l___J
-     |_ | _|           |_ | _|           |_ | _|           |_ | _|
-jgs (___|___)         (___|___)         (___|___)         (___|___)
-     ^^^ ^^^           ^^^ ^^^           ^^^ ^^^           ^^^ ^^^
-```
-
 # OSINT Platoon
 
 Multi-agent OSINT framework built to run natively inside **Claude Code**. Squads are Claude Code `Agent` tool subagents — not subprocess calls, not API wrappers. The orchestrator dispatches parallel agents from inside an active Claude Code session, collects SPOT reports, and synthesizes a SALUTE final product.
