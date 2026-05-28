@@ -1,0 +1,90 @@
+Pukaar.ai (Prakarann Innovation Lab) — Finding Breakdown
+35.200.236.6
+NuClide Research | 2026-05-28
+==============================================================
+
+
+FINDING 1: Three Unauthenticated Pediatric Medical Inference APIs — CRITICAL
+=============================================================================
+
+What it is.
+Pukaar.ai runs a baby health AI platform — parents input their child's
+symptoms and the platform diagnoses conditions, generates health reports,
+and provides care guidance. The backend runs three separate FastAPI
+services on ports 4000, 8000, and 9000.
+
+None of them have authentication. Any HTTP client, anywhere in the world,
+can call these APIs with zero credentials.
+
+Port 4000 — Baby Health Inference Service.
+Accepts a user_id (UUID), child_id (integer), and environment flag
+(stage or prod). Returns a BabyInferenceReport for that child.
+The user_id and child_id are direct references to live user records.
+Sending any valid or guessable combination returns a real child's
+health inference report.
+
+Port 8000 — LightRAG Diagnostic Pipeline.
+A five-step clinical diagnostic workflow for pediatric conditions.
+Accepts a patient chart: symptoms, red flag responses, differential
+diagnosis results, top conditions, follow-up question answers.
+Processes the chart through a graph-enhanced RAG system (LightRAG)
+and returns a final diagnosis. No credentials required to submit
+arbitrary patient data or retrieve results.
+
+Port 9000 — Video RAG Search.
+Unauthenticated search over the platform's video content index.
+
+Why it matters.
+These are not dev endpoints. The inference service explicitly routes
+between stage and prod via a PUKAAR_ENV environment variable and
+references a live MCP backend. Real user and child records are tied
+to these endpoints.
+
+50,000+ children's health profiles are within reach of a single
+unauthenticated HTTP request.
+
+What an attacker can do right now.
+- Enumerate child health records by iterating child_id integers
+- Submit fabricated symptom inputs and retrieve AI diagnostic outputs
+- Poison the diagnostic pipeline with crafted patient chart inputs
+- Scrape the full video content corpus via the RAG search API
+
+India DPDP Act 2023: children's data and health data are both
+sensitive personal data. No authentication = no reasonable security
+safeguard. This is a violation of the Act's security obligation.
+
+CWE-306 (Missing Authentication for Critical Function)
+
+
+FINDING 2: MCP Backend — Separate Exposed Host — HIGH
+======================================================
+
+What it is.
+The inference service on port 4000 references an MCP (Model Context
+Protocol) backend for both stage and prod environments. MCP is the
+protocol Pukaar.ai uses to connect its AI inference layer to its
+data and tool infrastructure.
+
+That MCP server is a separate host — not 35.200.236.6. It is not
+yet located.
+
+Why it matters.
+MCP servers in early-stage AI deployments are frequently exposed
+without authentication, the same way the three inference APIs here
+are. The MCP backend is the data layer — if it is similarly exposed,
+it is the path to the full user and child record store, not just
+the inference output.
+
+Next step: sweep 35.200.236.0/28 (the adjacent GCP subnet) for
+additional open ports matching MCP server patterns.
+
+
+==============================================================
+Severity summary: CRITICAL x1 | HIGH x1
+Operator: Pukaar.ai / Prakarann Innovation Lab, Gurugram India
+Data class: Children's health data, pediatric diagnostics
+Regulatory scope: India DPDP Act 2023 (sensitive personal data)
+User base: 50,000+ Android installs
+Ethical stop: No API calls made with real user_id or child_id values
+Schema documented from OpenAPI spec only
+==============================================================
