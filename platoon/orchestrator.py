@@ -16,6 +16,7 @@ from platoon.squads.weapons import WeaponsSquad
 from platoon.utils.claude_runner import run_claude
 from platoon.utils.logger import get_logger
 from platoon.utils.mett_tc import run_mett_tc_analysis
+from platoon.utils.orp import run_leaders_recon
 
 _REPLAN_SYSTEM = """\
 You are the Platoon Leader — OSINT research orchestrator (ATP 3-21.8).
@@ -102,18 +103,34 @@ class Orchestrator:
 
         # TLP Step 3: Make a tentative plan — METT-TC analysis
         log.log("tlp_step3_mett_tc_start")
-        mett_tc_text, squad_tasks = await run_mett_tc_analysis(
+        mett_tc_text, initial_tasking = await run_mett_tc_analysis(
             target, target_type, depth
         )
-        log.log("mett_tc_complete", tasks_planned=len(squad_tasks))
-
-        initial_tasking = MissionTasking(
-            target=target,
-            target_type=target_type,
-            depth=depth,
-            squad_tasks=squad_tasks,
-        )
+        initial_tasking.mission_id = mission_id
+        log.log("mett_tc_complete",
+                tasks_planned=len(initial_tasking.squad_tasks),
+                ccir=initial_tasking.ccir[:80] if initial_tasking.ccir else "",
+                pirs=len(initial_tasking.pirs))
         ps.set_tasking(initial_tasking)
+
+        # ORP — Leader's Recon (para 7-15/7-111): confirm target before committing squads
+        # Passive pre-check only. Does not touch the target actively.
+        log.log("orp_leaders_recon_start")
+        orp_result = await run_leaders_recon(target, target_type, initial_tasking)
+        log.log("orp_complete",
+                contact_action=orp_result["contact_action"],
+                ethics_flags=orp_result.get("ethics_flags", []))
+
+        # Five contact option branches (para 4-68): attack/defend/bypass/delay/withdraw
+        if orp_result["contact_action"] == "bypass":
+            log.log("mission_bypassed", reason=orp_result.get("reason", ""))
+            return self._minimal_salute(target, orp_result.get("reason", "bypassed at ORP"))
+        elif orp_result["contact_action"] == "withdraw":
+            log.log("mission_withdrawn", reason=orp_result.get("reason", ""))
+            return self._minimal_salute(target, orp_result.get("reason", "withdrawn at ORP"))
+        # attack/deliberate/delay all proceed — delay just logs a note
+        if orp_result["contact_action"] == "delay":
+            log.log("orp_delay_noted", reason=orp_result.get("reason", ""))
 
         # TLP Steps 4–6: Initiate movement, conduct recon, complete the plan
         while ps.should_continue():
@@ -217,7 +234,15 @@ class Orchestrator:
         weapons_tasking.targets = [target, *all_pivots[:5]]
 
         weapons_report = await self._weapons.run(target, weapons_tasking)
-        log.log("weapons_complete", finds=len(weapons_report.finds))
+        log.log("weapons_complete", finds=len(weapons_report.finds),
+                lace_casualties=weapons_report.lace.casualties)
+
+        # Log aggregate LACE across all squads (para 7-116)
+        log.log("lace_aggregate",
+                alpha=alpha_report.lace.model_dump(),
+                bravo=bravo_report.lace.model_dump(),
+                charlie=charlie_report.lace.model_dump(),
+                weapons=weapons_report.lace.model_dump())
 
         return {
             "alpha": alpha_report,
@@ -328,6 +353,23 @@ class Orchestrator:
             raw={"intel_picture": intel},
         )
 
+    # ── Minimal SALUTE for ORP bypass/withdraw ───────────────────────────────
+
+    @staticmethod
+    def _minimal_salute(target: str, reason: str) -> SALUTEReport:
+        return SALUTEReport(
+            subject=target,
+            activity="Mission halted at ORP",
+            location=target,
+            unit_org="",
+            timeline=[],
+            exposure="No active probing conducted",
+            executive_summary=f"Mission against {target} halted at Objective Rally Point: {reason}",
+            key_findings=[reason],
+            confidence=0.0,
+            raw={"halted_at_orp": True, "reason": reason},
+        )
+
     # ── Dry run ───────────────────────────────────────────────────────────────
 
     async def dry_run(
@@ -339,7 +381,7 @@ class Orchestrator:
         log = get_logger()
         log.log("dry_run_start", target=target)
 
-        mett_tc_text, squad_tasks = await run_mett_tc_analysis(
+        mett_tc_text, tasking = await run_mett_tc_analysis(
             target, target_type, depth
         )
 
@@ -349,16 +391,24 @@ class Orchestrator:
             "",
             mett_tc_text,
             "",
+        ]
+        if tasking.ccir:
+            lines += [f"CCIR: {tasking.ccir}", ""]
+        if tasking.pirs:
+            lines += ["PIRs:"] + [f"  - {p}" for p in tasking.pirs] + [""]
+        lines += [
             "PLANNED SQUAD TASKINGS:",
             "-" * 40,
         ]
-        for t in squad_tasks:
+        for t in tasking.squad_tasks:
             lines.append(
                 f"  [{t.squad.upper()}] {t.objective}"
-                f" | priority={t.priority} | mode={t.mode}"
+                f" | priority={t.priority} | wcs={t.weapons_control} | mode={t.mode}"
             )
             if t.targets:
                 lines.append(f"    targets: {', '.join(t.targets[:3])}")
+            if t.disengagement_criteria:
+                lines.append(f"    disengage if: {', '.join(t.disengagement_criteria[:2])}")
 
         lines += [
             "",

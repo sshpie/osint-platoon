@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timezone
-from platoon.models.spot_report import SPOTReport, Finding
+from platoon.models.spot_report import SPOTReport, Finding, LACEReport
 from platoon.models.tasking import SquadTasking
 from platoon.utils.claude_runner import run_claude
 from platoon.utils.logger import get_logger
@@ -16,8 +16,12 @@ data breach appearances, paste sites, forums, and any publicly indexed reference
 
 Rules of Engagement:
 - PASSIVE mode. Read-only. No logins, no account creation, no form submissions.
+- Weapons Control: TIGHT — report only positively confirmed findings.
 - Use web_search to gather intelligence on the target.
 - Cite every finding with its source URL.
+
+Disengagement criteria: stop collecting on a source if it returns rate-limit signals,
+requires authentication, or shows signs of being a canary/honeypot.
 
 Output: After completing reconnaissance, end your response with a SPOT report as a JSON block:
 
@@ -35,7 +39,14 @@ Output: After completing reconnaissance, end your response with a SPOT report as
     }
   ],
   "pivots": ["domain to investigate", "username found", "email address"],
-  "confidence": 0.7
+  "confidence": 0.7,
+  "lace": {
+    "liquid": "ok|rate_limited|blocked",
+    "ammo": -1,
+    "casualties": 0,
+    "equipment": "ok|degraded"
+  },
+  "dead_space": ["surfaces seen but not accessible", "auth-gated endpoint found"]
 }
 ```
 """
@@ -44,21 +55,29 @@ Output: After completing reconnaissance, end your response with a SPOT report as
 class SquadAlpha:
     async def run(self, target: str, tasking: SquadTasking) -> SPOTReport:
         log = get_logger()
-        log.log("squad_dispatched", squad="alpha", objective=tasking.objective[:80])
+        log.log("squad_dispatched", squad="alpha", objective=tasking.objective[:80],
+                wcs=tasking.weapons_control)
 
         brief = (
             f"MISSION — SQUAD ALPHA — WEB RECON\n\n"
             f"Primary target: {target}\n"
             f"Objective: {tasking.objective}\n"
             f"Additional targets: {', '.join(tasking.targets) if tasking.targets else 'none'}\n"
-            f"Priority: {tasking.priority} | Mode: {tasking.mode.upper()}\n\n"
-            f"Execute web reconnaissance. Search for:\n"
+            f"Priority: {tasking.priority} | Mode: {tasking.mode.upper()}"
+            f" | WCS: {tasking.weapons_control.upper()}\n"
+        )
+        if tasking.disengagement_criteria:
+            brief += f"Disengage if: {', '.join(tasking.disengagement_criteria)}\n"
+        brief += (
+            f"\nExecute web reconnaissance. Search for:\n"
             f"1. News and media mentions\n"
             f"2. Business filings / public records\n"
             f"3. Data breach appearances (HaveIBeenPwned, breach databases)\n"
             f"4. Paste site / code repository leaks\n"
             f"5. Social media cross-references\n"
             f"6. Any emails, phone numbers, addresses associated with the target\n\n"
+            f"Note any surfaces that were visible but inaccessible (auth-gated, rate-limited) "
+            f"in the dead_space field.\n\n"
             f"Conclude with the SPOT JSON block."
         )
 
@@ -70,7 +89,7 @@ class SquadAlpha:
         )
         report = _parse_spot(text, "alpha")
         log.log("spot_report", squad="alpha", findings=len(report.finds), pivots=len(report.pivots),
-                confidence=report.confidence)
+                confidence=report.confidence, casualties=report.lace.casualties)
         return report
 
 
@@ -103,11 +122,23 @@ def _parse_spot(text: str, squad: str) -> SPOTReport:
                     ))
                 except Exception:
                     continue
+
+            # Parse LACE report
+            lace_raw = data.get("lace", {})
+            lace = LACEReport(
+                liquid=lace_raw.get("liquid", "ok"),
+                ammo=int(lace_raw.get("ammo", -1)),
+                casualties=int(lace_raw.get("casualties", 0)),
+                equipment=lace_raw.get("equipment", "ok"),
+            )
+
             return SPOTReport(
                 squad=squad,  # type: ignore[arg-type]
                 finds=finds,
                 pivots=[str(p)[:200] for p in data.get("pivots", [])[:10]],
                 confidence=float(data.get("confidence", 0.5)),
+                lace=lace,
+                dead_space=[str(s)[:200] for s in data.get("dead_space", [])[:10]],
                 raw={"response_preview": text[:1000]},
             )
         except (json.JSONDecodeError, Exception):

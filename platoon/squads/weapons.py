@@ -45,7 +45,9 @@ Output: Conclude with SPOT JSON:
     }
   ],
   "pivots": ["author name", "company name", "email from metadata"],
-  "confidence": 0.7
+  "confidence": 0.7,
+  "lace": {"liquid": "ok|rate_limited|blocked", "ammo": -1, "casualties": 0, "equipment": "ok"},
+  "dead_space": ["paywalled PDF", "auth-gated document repository"]
 }
 ```
 """

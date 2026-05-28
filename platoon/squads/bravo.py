@@ -38,7 +38,9 @@ Output: Conclude with a SPOT JSON block:
     }
   ],
   "pivots": ["related domain", "IP range", "registrant email"],
-  "confidence": 0.8
+  "confidence": 0.8,
+  "lace": {"liquid": "ok|rate_limited|blocked", "ammo": -1, "casualties": 0, "equipment": "ok"},
+  "dead_space": ["auth-gated registrar", "private WHOIS"]
 }
 ```
 """
@@ -98,7 +100,8 @@ async def _cert_transparency(domain: str) -> list[str]:
 class SquadBravo:
     async def run(self, target: str, tasking: SquadTasking) -> SPOTReport:
         log = get_logger()
-        log.log("squad_dispatched", squad="bravo", objective=tasking.objective[:80])
+        log.log("squad_dispatched", squad="bravo", objective=tasking.objective[:80],
+                wcs=tasking.weapons_control)
 
         # Extract domain-like targets for DNS/WHOIS
         domains = [t for t in tasking.targets if "." in t and not t.startswith("@")]

@@ -37,7 +37,9 @@ Output: Conclude with SPOT JSON:
     }
   ],
   "pivots": ["alternate username", "linked email", "associated org"],
-  "confidence": 0.7
+  "confidence": 0.7,
+  "lace": {"liquid": "ok|rate_limited|blocked", "ammo": -1, "casualties": 0, "equipment": "ok"},
+  "dead_space": ["login-walled profile", "deleted account seen in cache"]
 }
 ```
 """
