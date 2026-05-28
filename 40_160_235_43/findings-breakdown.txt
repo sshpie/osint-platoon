@@ -1,0 +1,152 @@
+Fluid Attacks Engineer VPS — Finding Breakdown
+40.160.235.43
+NuClide Research | 2026-05-28
+==============================================================
+
+
+FINDING 1: Unauthenticated Home Directory Listing — CRITICAL
+=============================================================
+
+What it is.
+Python's built-in HTTP server (SimpleHTTPServer) was running on port 8080,
+serving the researcher's home directory with no authentication. Any HTTP
+client could browse and download every file in the directory tree.
+
+This is the entry point for every finding below. One open port, no
+credentials required, full filesystem access.
+
+What's exposed.
+68 entries at the top level. The full working environment of a security
+engineer: dotfile directories for 33+ AI agent tools, config files,
+logs, credentials, personal projects, financial records, and an ICS
+simulation environment.
+
+Why it matters.
+A security engineer's machine is a high-value target. It holds credentials
+for every platform they use professionally and personally. A single
+unauthenticated HTTP server turns a locked-down VPS into an open vault.
+
+CWE-548 (Exposure of Information Through Directory Listing)
+
+
+FINDING 2: LLM Platform Credentials — CRITICAL
+================================================
+
+What's exposed.
+Five config directories, each containing active credentials:
+
+.claude/.credentials.json
+  Anthropic Claude Code OAuth token. Team subscription tier. This is a
+  live session token — not an API key but a full authenticated session
+  granting access to the researcher's Claude Code account.
+
+.codex/auth.json
+  OpenAI ChatGPT JWT access token and refresh token for
+  cvargas@fluidattacks.com. Team plan, org owner role. Owner access to
+  an organization account means full admin over every team member and
+  project in that org.
+
+.openclaw/.env
+  Six separate credentials in one file:
+  - Gemini API key
+  - OpenRouter API key (multi-model proxy — one key, access to dozens of
+    hosted models including GPT-4, Claude, Gemini, Llama)
+  - GCP Vertex AI bearer token (live at collection time)
+  - Perplexity API key
+  - OpenCode API key
+  - Telegram bot token
+
+.gemini/oauth_creds.json
+  Google OAuth access + refresh token for dthmchg@gmail.com with
+  cloud-platform scope. Cloud-platform scope means access to GCP APIs
+  tied to that Google account.
+
+What an attacker can do right now.
+- Run inference at the researcher's expense across every major LLM
+  platform simultaneously
+- Use the OpenAI org owner token to read all team conversations, billing
+  data, and usage history
+- Use the GCP Vertex bearer token to query any GCP API the linked account
+  has access to
+- Use the Google OAuth refresh token to maintain persistent GCP access
+  even after the bearer token expires
+
+CWE-312 (Cleartext Storage of Sensitive Information)
+CWE-522 (Insufficiently Protected Credentials)
+
+
+FINDING 3: GitHub Personal Access Token — HIGH
+================================================
+
+What it is.
+.config/gh/hosts.yml contains a GitHub CLI OAuth token for the tachote
+account. GitHub CLI tokens carry full repo read/write access by default.
+
+What's exposed.
+- Push access to all of tachote's repositories
+- Ability to read any private repos
+- tachote's public repos include security tools: taker (Fluid Attacks MCP
+  integration), mcp-interactsh (OAST server wrapper), CVE-2021-4034 (pkexec
+  LPE), php-reverse-shell — the token provides write access to all of them
+
+What an attacker can do right now.
+Backdoor a security tool published by a MITRE CNA researcher. taker is
+integrated with Fluid Attacks' production pentest reporting pipeline.
+Malicious code in taker propagates into client pentest reports.
+
+
+FINDING 4: Anonymous MQTT Broker — ICS/OT Telemetry — HIGH
+============================================================
+
+What it is.
+Mosquitto MQTT broker on port 1884, configured with allow_anonymous true.
+No credentials required to connect, subscribe, or publish.
+
+What's exposed.
+Topic fleet/site-042/public/telemetry/hmi: real-time telemetry stream
+including tank level, line pressure, flow rate, pump speed, valve position,
+and alarm states.
+
+Topic fleet/site-042/internal/hmi/operator-credentials: operator
+credentials published in plaintext — multiple format variants (JSON, CSV,
+base64, hash).
+
+ICS topology includes Siemens S7 PLC and wind turbine HMI.
+
+Assessment.
+The credential string pwnedvps and the format-enumeration pattern in the
+log strongly suggest a research/CTF simulation, not live industrial
+infrastructure. This is consistent with ICS security research. Treat as
+simulated unless confirmed otherwise.
+
+Two external clients observed connecting — identity unknown.
+
+Why it still matters.
+If this is live OT: unauthenticated access to an industrial HMI broker
+with operator credentials in the stream is a serious incident.
+If this is a simulation: the researcher's simulation environment is
+fully exposed to external clients connecting unauthenticated.
+
+
+FINDING 5: CUPS :631 — CVE-2024-47176 Surface — MEDIUM
+========================================================
+
+What it is.
+CUPS (Common Unix Printing System) 2.4.19 on port 631. Returns 403.
+
+CVE-2024-47176 and CVE-2024-47177 (September 2024) form an RCE chain
+against publicly exposed CUPS/IPP. Patch boundary requires confirming
+exact CUPS version against the fix release.
+
+Version not confirmed against patched range this pass — 403 response
+does not expose the full CUPS version string.
+
+
+==============================================================
+Severity summary: CRITICAL x2 | HIGH x2 | MEDIUM x1
+Operator: Cristian Vargas, Fluid Attacks security engineer
+Host type: Personal research VPS (not company production)
+Credentials: Documented by class. No credentials used.
+MQTT: Assessed as research simulation.
+Ethical stop applied throughout.
+==============================================================
