@@ -15,7 +15,7 @@ Doctrine: US Army ATP 3-21.8.
 ## Setup
 
 ```bash
-git clone https://github.com/Nicholas-Kloster/osint-platoon
+git clone https://github.com/nuclide-research/osint-platoon
 cd osint-platoon
 claude
 ```
@@ -112,7 +112,7 @@ pip install -r requirements.txt
 cp .env.example .env  # add ANTHROPIC_API_KEY
 
 python cli.py --target example.com --type domain --depth deliberate
-python cli.py --target 1.2.3.4 --type ip --depth detailed
+python cli.py --target 1.2.3.4 --type domain --depth detailed
 python cli.py --target example.com --dry-run
 ```
 
