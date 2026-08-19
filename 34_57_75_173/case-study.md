@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-28
 **Method:** osint-platoon multi-agent dispatch (ORP + 3 squads in parallel)
-**Researcher:** Nicholas Kloster / NuClide Research
+**Researcher:**  / 
 
 ---
 
@@ -124,7 +124,7 @@ CWE-615 (Inclusion of Sensitive Information in Source Code Comments — applied 
 | 2 | VisorGraph | 0 nodes — no TLS cert on open ports, no pivot surface |
 | 3 | aimap-profile | AI multi-agent platform, B2B risk analysis, client business data — no healthcare/HIPAA flag |
 | 4 | JS-bundle | Not run — no extractable JS bundle surface on open ports |
-| 5 | VisorLog | 1 event ingested to nuclide.db |
+| 5 | VisorLog | 1 event ingested to .db |
 | 6 | VisorScuba | Not run this pass |
 | 7 | BARE | Best match 0.461 (`exploit/multi/http/apache_apisix_api_default_token_rce`) — semantic overlap on "unauthenticated API default token." Not applicable. Novel class — no MSF coverage for unauth Agno AgentOS. |
 | 8 | VisorCorpus | LLM-adjacent surface. Not run. |

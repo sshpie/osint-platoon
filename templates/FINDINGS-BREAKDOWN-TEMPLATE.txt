@@ -1,6 +1,6 @@
 {TARGET_LABEL} — Finding Breakdown
 {IP} / {DOMAIN}
-NuClide Research | {DATE}
+ | {DATE}
 ==============================================================
 
 

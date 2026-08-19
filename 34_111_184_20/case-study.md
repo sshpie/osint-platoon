@@ -1,8 +1,8 @@
 # Case Study: 34.111.184.20 — Business Insider Data Engineering Cluster
 
 **Date:** 2026-05-28  
-**Method:** osint-platoon multi-agent dispatch (ORP + 4 squads in parallel) + full NuClide arsenal chain  
-**Researcher:** Nicholas Kloster / NuClide Research
+**Method:** osint-platoon multi-agent dispatch (ORP + 4 squads in parallel) + full  arsenal chain  
+**Researcher:**  / 
 
 ---
 
@@ -159,7 +159,7 @@ Both GHSA-56px-hm34-xqj5 and CVE-2026-31892 fixed in 3.7.11 / 4.0.2. IAP gate ra
 | 2 | VisorGraph | 4 nodes / 1 edge on primary IP; 39 nodes / 13 edges on full host seed set; 13 single-SAN certs (no wildcard pivot) |
 | 3 | aimap-profile | Completed (fast mode); commercial sector, no ethics flags |
 | 4 | JS-bundle | No extractable bundle (Argo gated at IAP layer) |
-| 5 | VisorLog | 3 findings ingested (nuclide.db): critical×1, high×2 |
+| 5 | VisorLog | 3 findings ingested (.db): critical×1, high×2 |
 | 6 | VisorScuba | Assessed; AI.C1 violation flagged; scoring schema is Ollama-centric, rule misfires on Atlantis/Argo findings |
 | 7 | BARE | F001 → TerraMaster unauth class (0.555); F002 → no MSF coverage (0.454, novel CVE); F003 → k8s_exec (0.630) |
 | 8 | VisorCorpus | N/A — no confirmed LLM inference surface |

@@ -1,6 +1,6 @@
 Proof of Concept: 35.200.236.6 — Unauthenticated Pediatric Medical Inference APIs
 Pukaar.ai / Prakarann Innovation Lab Private Limited
-NuClide Research | 2026-05-28
+ | 2026-05-28
 ================================================================================
 
 SUMMARY

@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-28
 **Method:** osint-platoon multi-agent dispatch (ORP + 4 squads in parallel)
-**Researcher:** Nicholas Kloster / NuClide Research
+**Researcher:**  / 
 
 ---
 
@@ -116,7 +116,7 @@ The inference service on :4000 references an MCP backend for stage and prod envi
 | Step | Tool | Result |
 |---|---|---|
 | 0 | JAXEN | Not run — manual squad dispatch |
-| 1 | aimap | Ports 4000/8000/9000 confirmed open HTTP 200. Port 9000 fingerprinted ZenML (false positive — confirmed Video RAG Search API via body). All three Uvicorn services confirmed live. aimap output ingested to nuclide.db. |
+| 1 | aimap | Ports 4000/8000/9000 confirmed open HTTP 200. Port 9000 fingerprinted ZenML (false positive — confirmed Video RAG Search API via body). All three Uvicorn services confirmed live. aimap output ingested to .db. |
 | 2 | VisorGraph | Not run — no TLS cert on any open port, no pivot surface |
 | 3 | aimap-profile | Healthcare AI, children's data, India DPDP Act — sensitive personal data classification |
 | 4 | JS-bundle | Not run — no web frontend surface on any open port |
@@ -148,7 +148,7 @@ Port 8000 queried — RAG index loaded with real pediatric clinical content: men
 
 **menlohunt:** Ran — missed ports 4000/8000 (not in default 29-port list). Port 9000 flagged as MinIO (false positive). No GCS/Firebase/Cloud Run misconfigs. Coverage gap: menlohunt + aimap are complementary on non-standard ports.
 
-**VisorScuba: 0/10 — AI.C1 violation** (unauthenticated AI service). Ingested to nuclide.db.
+**VisorScuba: 0/10 — AI.C1 violation** (unauthenticated AI service). Ingested to .db.
 
 ## Intelligence Gaps
 

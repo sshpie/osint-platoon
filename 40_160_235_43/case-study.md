@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-28
 **Method:** osint-platoon multi-agent dispatch (ORP + 4 squads in parallel)
-**Researcher:** Nicholas Kloster / NuClide Research
+**Researcher:**  / 
 
 ---
 

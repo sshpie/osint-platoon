@@ -1,6 +1,6 @@
 Proof of Concept: Voomi Supply — Temporal Credential Leak + Unauthenticated Scheduler
 5.78.67.23 / voomisupply.com
-NuClide Research | 2026-05-28
+ | 2026-05-28
 ================================================================================
 
 SUMMARY

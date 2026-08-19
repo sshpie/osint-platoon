@@ -15,7 +15,7 @@ Doctrine: US Army ATP 3-21.8.
 ## Setup
 
 ```bash
-git clone https://github.com/nuclide-research/osint-platoon
+git clone https://github.com/sshpie/osint-platoon
 cd osint-platoon
 claude
 ```
@@ -40,7 +40,7 @@ run the osint platoon on example.com
 run the osint platoon on "Acme Corp"
 ```
 
-Claude Code reads squad templates from `platoon/squads/`, dispatches Alpha / Bravo / Charlie / Weapons in parallel, and synthesizes SPOT reports into a SALUTE. The full NuClide arsenal chain runs on every target.
+Claude Code reads squad templates from `platoon/squads/`, dispatches Alpha / Bravo / Charlie / Weapons in parallel, and synthesizes SPOT reports into a SALUTE. The full  arsenal chain runs on every target.
 
 **Depth:**
 
@@ -64,7 +64,7 @@ Claude Code Session (Orchestrator)
   ├── Agent: Squad Alpha    — Web recon (news, mentions, breach data, paste sites)
   ├── Agent: Squad Bravo    — Infrastructure (DNS, WHOIS, crt.sh, ASN, cert pivots)
   ├── Agent: Squad Charlie  — Social footprint (usernames, profiles, cross-platform)
-  └── Agent: Weapons Squad  — Document intel + full NuClide arsenal chain
+  └── Agent: Weapons Squad  — Document intel + full  arsenal chain
 ```
 
 Each squad returns a SPOT report (Size / Activity / Location / Unit / Time / Equipment). The orchestrator synthesizes all four into a SALUTE and replans off discovered pivots.
@@ -82,7 +82,7 @@ Every target runs the full chain:
 | 2 | VisorGraph | Cert pivot → operator attribution |
 | 3 | aimap-profile | Target classification + ethics flags |
 | 4 | JS-bundle | Hidden API / secret extraction |
-| 5 | VisorLog | Ledger ingest → nuclide.db |
+| 5 | VisorLog | Ledger ingest → .db |
 | 6 | VisorScuba | Compliance scoring |
 | 7 | BARE | Module ranking against 3,904 Metasploit entries |
 | 8 | VisorCorpus | Corpus analysis for LLM-adjacent surfaces |

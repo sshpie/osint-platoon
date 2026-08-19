@@ -1,8 +1,8 @@
 # Case Study: 5.78.67.23 — Voomi Supply Data Pipeline
 
 **Date:** 2026-05-28  
-**Method:** osint-platoon multi-agent dispatch (ORP + 3 squads in parallel) + full NuClide arsenal chain  
-**Researcher:** Nicholas Kloster / NuClide Research
+**Method:** osint-platoon multi-agent dispatch (ORP + 3 squads in parallel) + full  arsenal chain  
+**Researcher:**  / 
 
 ---
 
@@ -130,7 +130,7 @@ BARE semantic matches for Kibana surface: `kibana_upgrade_assistant_telemetry_rc
 | 2 | VisorGraph | 0 nodes — self-signed CA not in CT logs, no pivot surface |
 | 3 | aimap-profile | Commercial sector, no ethics flags |
 | 4 | JS-bundle | N/A — Temporal UI IP not confirmed; ES/Kibana gated |
-| 5 | VisorLog | 2 findings ingested (nuclide.db): critical×2 |
+| 5 | VisorLog | 2 findings ingested (.db): critical×2 |
 | 6 | VisorScuba | Queued — pending findings ingest |
 | 7 | BARE | V001 (ES creds): no MSF coverage (novel); V002 (Temporal unauth): no MSF coverage (novel); V003 (Kibana): kibana_rce modules matched (historical CVEs, not applicable to 8.17.2) |
 | 8 | VisorCorpus | N/A — no LLM inference surface confirmed |

@@ -1,6 +1,6 @@
 Proof of Concept: atlantis.test.data.insider.engineering — Unauthenticated Atlantis
 Business Insider / Insider Inc. (Axel Springer)
-NuClide Research | 2026-05-28
+ | 2026-05-28
 ================================================================================
 
 SUMMARY
